@@ -70,15 +70,31 @@ function today(ss) {
 }
 
 function writeSummary(ss, rows) {
-  var sheet = ss.getSheetByName(TAB_SUMMARY) || ss.insertSheet(TAB_SUMMARY);
   var values = [SUMMARY_HEADERS];
   for (var i = 0; i < rows.length; i++) values.push(summaryRowToArray(rows[i]));
+
+  var sheet = ss.getSheetByName(TAB_SUMMARY) || ss.insertSheet(TAB_SUMMARY);
+  try {
+    fillSummary(sheet, values);
+    if (String(sheet.getRange(1, 1).getValue()) === SUMMARY_HEADERS[0]) return;
+  } catch (err) {
+    // fall through and rebuild the tab
+  }
+  // Something done by hand to the script-owned tab (for example Format > Convert
+  // to table, which takes over the header row) stopped the write. Rebuild the tab.
+  var index = sheet.getIndex();
+  ss.deleteSheet(sheet);
+  sheet = ss.insertSheet(TAB_SUMMARY, index - 1);
+  fillSummary(sheet, values);
+}
+
+function fillSummary(sheet, values) {
   sheet.clear();
   // Task Name .. Overdue are text so 'YYYY-MM-DD' and 'CHECK LABEL' are kept as written.
   sheet.getRange(1, 1, values.length, 5).setNumberFormat('@');
-  if (rows.length) {
+  if (values.length > 1) {
     var pctCol = SUMMARY_HEADERS.indexOf('Percent Remaining') + 1;
-    sheet.getRange(2, pctCol, rows.length, 1).setNumberFormat('0%');
+    sheet.getRange(2, pctCol, values.length - 1, 1).setNumberFormat('0%');
   }
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
   sheet.setFrozenRows(1);

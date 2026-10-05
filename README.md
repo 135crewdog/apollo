@@ -26,6 +26,8 @@ The workbook is a Google Sheet named "Apollo" with the tabs `Training Log`, `Gro
 6. Deploy the web app. Click **Deploy → New deployment**, click the gear next to **Select type** and choose **Web app**. Set **Execute as: Me** and **Who has access: Anyone**. Click **Deploy** and copy the **Web app URL**. The app's Settings screen takes this URL and the token.
 7. Reload the workbook. An **Apollo** menu appears with **Refresh**. The summary also rewrites itself when the workbook opens and after any hand edit to the log or config tabs.
 
+Formatting the tabs by hand is fine (colours, widths, percent and date formats), with one exception: do not use **Format → Convert to table** on the `Individual Training Summary` tab. A Table takes over the header row with its own column names and the script cannot write through it. The script now rebuilds the tab if that happens, but anything you set on it by hand is lost on every refresh anyway, because the tab is rewritten each time. Tables on the config tabs and the Training Log are fine.
+
 After changing the script later, paste the new file contents over the old ones, save, then **Deploy → Manage deployments → edit (pencil) → Version: New version → Deploy** so the web app URL serves the new code. The URL does not change.
 
 ## Check it from a browser
