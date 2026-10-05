@@ -60,13 +60,14 @@ function refreshSummary(ss) {
   var ground = readGround(ss);
   var flying = readFlying(ss);
   var log = readLog(ss);
-  var rows = buildSummary(ground, flying, log, today(ss));
+  var rows = buildSummary(ground, flying, log, today());
   writeSummary(ss, rows);
   return rows;
 }
 
-function today(ss) {
-  return Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+/** Today's date in Zulu (UTC). Every date in Apollo is Zulu, no exceptions. */
+function today() {
+  return Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
 }
 
 function writeSummary(ss, rows) {
@@ -138,6 +139,11 @@ function cellText(v) {
   return v == null ? '' : String(v).trim();
 }
 
+/**
+ * A date cell holds a calendar date (a Zulu date, typed as such). Sheets stores it
+ * as midnight in the spreadsheet's time zone, so formatting it in that same zone
+ * gives back exactly the date that was typed, whatever the zone is set to.
+ */
 function cellDate(ss, v) {
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return '';
@@ -307,7 +313,7 @@ function buildPayload(ss, summary) {
       percentCreditInSim: parsePercent(f.percentCreditInSim)
     };
   });
-  return { ok: true, asOf: today(ss), ground: ground, flying: flying, summary: summary };
+  return { ok: true, asOf: today(), ground: ground, flying: flying, summary: summary };
 }
 
 function parseBody(e) {

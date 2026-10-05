@@ -2,10 +2,11 @@
 
 Personal KC-135 aircrew training tracker. A phone PWA logs training events into a Google Sheets workbook. A script inside the workbook works out currency, due dates and volume and writes them to a summary tab.
 
-## The two project rules
+## The three project rules
 
 1. **SIMPLE.** The log is three columns, one accomplishment per row. Plain HTML/CSS/JS, no framework, no build step, no runtime dependencies. When in doubt, choose fewer columns, files and features.
 2. **FUTURE-PROOF.** Everything the app knows about training requirements comes from the two config tabs. Aircrew will edit those tabs for years, in the RTM's own plain words. An RTM change must never need a code change. Never hardcode a Task ID, a task name, or behaviour for one specific event.
+3. **ZULU.** Every date and time in the log, the summary, the API and the app is Zulu (UTC). No exceptions. "Today" is the UTC date, never the phone's or the spreadsheet's local date. A sortie is logged on its Zulu date.
 
 Ask the user before adding anything that is not in this file. Ideas that were discussed and not adopted are listed under "Parked" at the end; do not build them without asking.
 
@@ -39,7 +40,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 - A row whose Training ID is not in either config tab is kept and ignored. Training IDs are matched trimmed and case-insensitive.
 - A row whose Date cannot be read as a date is ignored.
 - The script writes the three headers if row 1 is empty and keeps the Mission Number column formatted as plain text.
-- **Typing dates by hand:** the workbook has a US locale and a London time zone, so `05/10/2026` is read as 10 May. Type `2026-10-05`. The app always sends that format.
+- **Typing dates by hand:** dates are Zulu dates. The workbook has a US locale, so `05/10/2026` is read as 10 May. Type `2026-10-05`. The app always sends that format.
 
 ### Config tabs
 
@@ -126,7 +127,7 @@ These are checked against the RTM. If the code disagrees with this table, the co
 
 ### Summary columns
 
-"Today" is today's date in the spreadsheet's time zone. "This FY" is the fiscal year containing today.
+"Today" is the UTC date. "This FY" is the fiscal year containing today.
 
 | Column | Value |
 |---|---|
@@ -176,7 +177,7 @@ tests/                 node --test
 Every response is JSON. Apps Script cannot set HTTP status codes, so errors come back as `{ "ok": false, "error": "..." }`.
 
 - `GET ?token=…` refreshes the summary and returns `{ ok, asOf, ground, flying, summary }`.
-  - `asOf` is today in the spreadsheet's time zone.
+  - `asOf` is today's UTC date.
   - `ground` is `[{ id, name, frequency }]`.
   - `flying` is `[{ id, name, currency, volumeRequired, percentCreditInSim }]` with `volumeRequired` a number or `null` and `percentCreditInSim` a fraction, so the app can hide 0% events in Sim without parsing.
   - `summary` is one object per summary row, keyed by the summary tab's column headers.
@@ -192,7 +193,9 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 ## Gotchas
 
-- **Dates are `YYYY-MM-DD` strings everywhere outside the sheet.** Do date math on year/month/day numbers, never on local-time `Date` objects. In the script, convert sheet dates with `Utilities.formatDate(d, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')`.
+- **Dates are `YYYY-MM-DD` strings everywhere outside the sheet.** Do date math on year/month/day numbers, never on local-time `Date` objects.
+- **Today is `Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')` in the script and `new Date().toISOString().slice(0, 10)` in the app.** Never `getDate()`, `getMonth()` or a date picker's local default.
+- **Reading a date cell:** a date cell is a calendar date, stored by Sheets as midnight in the spreadsheet's time zone, so convert it with `Utilities.formatDate(d, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')` to get back exactly the date that was typed. Formatting it in UTC would shift it a day whenever the spreadsheet's zone is not UTC. The workbook's time zone is set to UTC anyway (File → Settings → Time zone), and the milestone 3 template ships that way.
 - **Percent Credit in Sim** may arrive as a number (`0.5`) or text (`50.00%`). Accept both. A bare number above 1 is read as a percentage (`50` is 50%).
 - **Volume Required** may arrive as a number, a numeric string, blank, or text such as `X`.
 - **Mission Number must be stored as plain text**, so values like `0123` or `1E5` are not altered by Sheets.

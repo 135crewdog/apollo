@@ -18,7 +18,7 @@ node --test
 
 The workbook is a Google Sheet named "Apollo" with the tabs `Training Log`, `Ground Training Config`, `Flying Training Config` and `Individual Training Summary`, with the row 1 headers listed in `CLAUDE.md`.
 
-1. Open the workbook in Google Sheets and choose **Extensions → Apps Script**. A script project bound to the workbook opens.
+1. Open the workbook in Google Sheets. Choose **File → Settings**, set **Time zone** to **(GMT+00:00) UTC** and save. Every date in Apollo is Zulu. Then choose **Extensions → Apps Script**. A script project bound to the workbook opens.
 2. In the editor, click `Code.gs` in the file list, select everything in it and delete it. Paste in the whole of `apps-script/Code.js`. Save (Ctrl/Cmd+S).
 3. Click the **+** next to **Files**, choose **Script**, and name the new file `rules`. Delete the stub it contains and paste in the whole of `apps-script/rules.js`. Save.
 4. Set the token. Click the gear (**Project Settings**) in the left bar, scroll to **Script Properties**, click **Add script property**, enter the property name `APOLLO_TOKEN` and, as the value, a long random secret of your own made of lowercase letters and digits only. Click **Save script properties**. Do not write the token anywhere in the repo or the workbook.
