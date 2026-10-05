@@ -11,8 +11,8 @@
  */
 
 var SUMMARY_HEADERS = [
-  'Task Name',
   'Task ID',
+  'Task Name',
   'Last Accomplished',
   'Due Date',
   'Overdue',
@@ -287,8 +287,8 @@ function summarizeEvent(event, rows, today) {
   }
 
   var row = {
-    'Task Name': event.name == null ? '' : event.name,
     'Task ID': event.id == null ? '' : event.id,
+    'Task Name': event.name == null ? '' : event.name,
     'Last Accomplished': last,
     'Due Date': due,
     'Overdue': overdue,

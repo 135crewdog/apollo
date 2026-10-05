@@ -38,7 +38,7 @@ Paste `WEB_APP_URL?token=YOUR_TOKEN` into a browser. The reply is JSON:
 { "ok": true, "asOf": "2026-10-05", "ground": [...], "flying": [...], "summary": [...] }
 ```
 
-`summary` is one object per summary row, keyed by the summary tab's column headers. `Percent Remaining` is a fraction (0.5 is 50%). Dates are `YYYY-MM-DD` strings. A problem comes back as `{ "ok": false, "error": "..." }`.
+`summary` is one object per summary row, keyed by the summary tab's column headers. The tab's columns run Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Remaining, Remaining Sim Credit. `Percent Remaining` is a fraction (0.5 is 50%). Dates are `YYYY-MM-DD` strings. A problem comes back as `{ "ok": false, "error": "..." }`.
 
 ## API
 

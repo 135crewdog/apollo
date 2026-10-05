@@ -351,10 +351,10 @@ test('buildSummary: ground rows then flying rows in config order, unknown IDs ig
   assert.deepEqual(summary.map((r) => r['Task ID']), ['G2', 'G1', 'F2', 'F1']);
   assert.deepEqual(summary.map((r) => r['Task Name']), ['Ground two', 'Ground one', 'Flying two', 'Flying one']);
 
-  assert.deepEqual(rules.summaryRowToArray(summary[0]), ['Ground two', 'G2', '2026-01-10', '2027-09-30', '', '', '', '', '']);
-  assert.deepEqual(rules.summaryRowToArray(summary[1]), ['Ground one', 'G1', '', '', '', '', '', '', '']);
-  assert.deepEqual(rules.summaryRowToArray(summary[2]), ['Flying two', 'F2', '2026-10-02', '2027-09-30', '', 2, 4, 0.5, 1]);
-  assert.deepEqual(rules.summaryRowToArray(summary[3]), ['Flying one', 'F1', '2026-09-15', '2026-10-31', '', 0, '', '', '']);
+  assert.deepEqual(rules.summaryRowToArray(summary[0]), ['G2', 'Ground two', '2026-01-10', '2027-09-30', '', '', '', '', '']);
+  assert.deepEqual(rules.summaryRowToArray(summary[1]), ['G1', 'Ground one', '', '', '', '', '', '', '']);
+  assert.deepEqual(rules.summaryRowToArray(summary[2]), ['F2', 'Flying two', '2026-10-02', '2027-09-30', '', 2, 4, 0.5, 1]);
+  assert.deepEqual(rules.summaryRowToArray(summary[3]), ['F1', 'Flying one', '2026-09-15', '2026-10-31', '', 0, '', '', '']);
 });
 
 test('buildSummary: numeric Task IDs match numeric log IDs', () => {
@@ -365,9 +365,9 @@ test('buildSummary: numeric Task IDs match numeric log IDs', () => {
   assert.equal(summary[0]['Task ID'], 101);
 });
 
-test('SUMMARY_HEADERS match CLAUDE.md', () => {
+test('SUMMARY_HEADERS: Task ID leads, then the CLAUDE.md columns', () => {
   assert.deepEqual(rules.SUMMARY_HEADERS, [
-    'Task Name', 'Task ID', 'Last Accomplished', 'Due Date', 'Overdue',
+    'Task ID', 'Task Name', 'Last Accomplished', 'Due Date', 'Overdue',
     'Volume Accomplished', 'Volume Required', 'Percent Remaining', 'Remaining Sim Credit',
   ]);
 });
