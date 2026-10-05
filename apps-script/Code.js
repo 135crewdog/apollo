@@ -37,32 +37,54 @@ function onEdit(e) {
   if (name === TAB_LOG || name === TAB_GROUND || name === TAB_FLYING) safeRefresh();
 }
 
-/** Menu entry and installable-trigger entry point. */
+/** Menu entry: refresh and always report the log check. */
 function refresh() {
-  refreshSummary(SpreadsheetApp.getActiveSpreadsheet());
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    var result = refreshSummary(ss);
+    ss.toast(describeLogCheck(result.logCheck, result.logRows), 'Apollo', 15);
+  } catch (err) {
+    ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
+  }
 }
 
-/** Refresh that reports a problem as a toast instead of a silent trigger failure. */
+/** Trigger refresh: quiet when all is well, a toast when the log needs attention or the refresh fails. */
 function safeRefresh() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
-    refreshSummary(ss);
+    var result = refreshSummary(ss);
+    if (result.logCheck.length) ss.toast(describeLogCheck(result.logCheck, result.logRows), 'Apollo', 15);
   } catch (err) {
-    ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 10);
+    ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
   }
+}
+
+var LOG_CHECK_TOAST_LINES = 5;
+
+function describeLogCheck(logCheck, logRows) {
+  if (!logCheck.length) return 'Summary refreshed. Log check: no problems in ' + logRows + ' rows.';
+  var lines = [logCheck.length + ' log row' + (logCheck.length === 1 ? '' : 's') + ' need attention:'];
+  for (var i = 0; i < logCheck.length && i < LOG_CHECK_TOAST_LINES; i++) {
+    var p = logCheck[i];
+    lines.push('Row ' + p.row + ': ' + p.problem + ' (' + [p.mission, p.date, p.id].join(' | ') + ')');
+  }
+  if (logCheck.length > LOG_CHECK_TOAST_LINES) lines.push('and ' + (logCheck.length - LOG_CHECK_TOAST_LINES) + ' more');
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
 // Refresh
 // ---------------------------------------------------------------------------
 
+/** Returns { summary, logCheck, logRows }. */
 function refreshSummary(ss) {
   var ground = readGround(ss);
   var flying = readFlying(ss);
   var log = readLog(ss);
-  var rows = buildSummary(ground, flying, log, today());
+  var day = today();
+  var rows = buildSummary(ground, flying, log, day);
   writeSummary(ss, rows);
-  return rows;
+  return { summary: rows, logCheck: checkLog(log, ground, flying, day), logRows: log.length };
 }
 
 /** Today's date in Zulu (UTC). Every date in Apollo is Zulu, no exceptions. */
@@ -212,6 +234,7 @@ function readLog(ss) {
     var date = cellDate(ss, r[t.col['Date']]);
     if (id === '' && date === '') continue;
     out.push({
+      row: i + 2,
       mission: cellText(r[t.col['Mission Number']]),
       date: date,
       id: id
@@ -300,7 +323,7 @@ function doPost(e) {
   });
 }
 
-function buildPayload(ss, summary) {
+function buildPayload(ss, result) {
   var ground = readGround(ss).map(function (g) {
     return { id: cellText(g.id), name: cellText(g.name), frequency: cellText(g.label) };
   });
@@ -313,7 +336,14 @@ function buildPayload(ss, summary) {
       percentCreditInSim: parsePercent(f.percentCreditInSim)
     };
   });
-  return { ok: true, asOf: today(), ground: ground, flying: flying, summary: summary };
+  return {
+    ok: true,
+    asOf: today(),
+    ground: ground,
+    flying: flying,
+    summary: result.summary,
+    logCheck: result.logCheck
+  };
 }
 
 function parseBody(e) {

@@ -42,6 +42,20 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 - The script writes the three headers if row 1 is empty and keeps the Mission Number column formatted as plain text.
 - **Typing dates by hand:** dates are Zulu dates. The workbook has a US locale, so `05/10/2026` is read as 10 May. Type `2026-10-05`. The app always sends that format.
 
+### Log check
+
+Every refresh checks the log and reports, never fixes, rows that need a human. One problem per row, worst first:
+
+| Row | Problem reported | Counted? |
+|---|---|---|
+| Blank Training ID | `blank Training ID, row ignored` | No |
+| Training ID not in either config tab | `Training ID not in either config tab, row ignored` | No |
+| Date blank or not readable as a date | `date is blank or not a date, row ignored` | No |
+| Date after today | `date is after today, row still counted` | Yes |
+| Mission Number starts with `SIM` but is not exactly `SIM` (`SIM1`, `Simulator`) | `Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row` | Yes, as aircraft |
+
+Rows with both a blank ID and a blank date are skipped silently. The report goes to two places: a toast in the sheet after a refresh (always after Apollo → Refresh, only when there are problems after an open or edit; the first five rows plus a count of the rest) and the `logCheck` list in the API payload, so the app's Status screen can show it. Nothing is written to any tab. Not caught: a plausible wrong date, a wrong but valid ID, and a duplicate row, which the spec treats as a second accomplishment.
+
 ### Config tabs
 
 - A row being present is what makes an event tracked. There is no profile tab and no crew position, FTL, or equipment setting. The user has already copied their own column of the RTM into these tabs.
@@ -169,18 +183,19 @@ tests/                 node --test
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
 - **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code.
-- **Refresh** rewrites the Individual Training Summary. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
+- **Refresh** rewrites the Individual Training Summary and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
 - **The app is offline-first.** A log entry goes into a local queue at once and syncs when there is a connection. Config, summary and queue are kept in `localStorage`.
 
 ### Web app API
 
 Every response is JSON. Apps Script cannot set HTTP status codes, so errors come back as `{ "ok": false, "error": "..." }`.
 
-- `GET ?token=…` refreshes the summary and returns `{ ok, asOf, ground, flying, summary }`.
+- `GET ?token=…` refreshes the summary and returns `{ ok, asOf, ground, flying, summary, logCheck }`.
   - `asOf` is today's UTC date.
   - `ground` is `[{ id, name, frequency }]`.
   - `flying` is `[{ id, name, currency, volumeRequired, percentCreditInSim }]` with `volumeRequired` a number or `null` and `percentCreditInSim` a fraction, so the app can hide 0% events in Sim without parsing.
   - `summary` is one object per summary row, keyed by the summary tab's column headers.
+  - `logCheck` is `[{ row, mission, date, id, problem }]` from the log check above, empty when the log is clean. `row` is the sheet row number.
 - `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows, refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
 - **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. The app stores the web app URL and token from its Settings screen. Never commit either.
 - **Retry safety without extra log columns:** the script keeps the last 50 `batchId` values in Script Properties under `APOLLO_BATCH_IDS`. A repeated `batchId` appends nothing and returns success. Appends and refreshes run under `LockService`.
@@ -188,7 +203,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 ### The app (three screens)
 
 - **Log:** pick Flight, Sim or Ground. Flight needs a mission number and date. Sim needs a date and writes `SIM` as the mission number. Ground needs a date only. Then a searchable list of events from the matching config tab, each with + and −. Save writes one row per tap. In Sim, events with 0% sim credit are not offered.
-- **Status:** the summary, overdue first, then by due date, with its "as of" date and the number of rows waiting to sync.
+- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, and the log check problems if there are any.
 - **Settings:** web app URL, token, Sync now.
 
 ## Gotchas

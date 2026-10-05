@@ -365,6 +365,48 @@ test('buildSummary: numeric Task IDs match numeric log IDs', () => {
   assert.equal(summary[0]['Task ID'], 101);
 });
 
+// ---------------------------------------------------------------------------
+// Log check
+// ---------------------------------------------------------------------------
+
+test('checkLog: reports ignored and suspect rows with the sheet row number, worst problem first', () => {
+  const ground = [{ id: 'GD27YM', name: 'CRM', label: 'Annual' }];
+  const flying = [{ id: 'AL01YM', name: 'Landing', label: 'Monthly', volumeRequired: 12, percentCreditInSim: 1 }];
+  const log = [
+    { row: 2, mission: '1234', date: '2026-10-02', id: 'AL01YN' },
+    { row: 3, mission: 'Simulator', date: '2026-10-02', id: 'AL01YM' },
+    { row: 4, mission: '', date: '2026-10-03', id: 'AL01YM' },
+    { row: 5, mission: '1234', date: '2062-10-03', id: 'AL01YM' },
+    { row: 6, mission: '', date: 'yesterday', id: 'GD27YM' },
+    { row: 7, mission: '', date: '', id: 'GD27YM' },
+    { row: 8, mission: '', date: '2026-09-01', id: '' },
+    { row: 9, mission: '', date: '2026-09-01', id: 'gd27ym ' },
+    { row: 10, mission: ' sim ', date: '2026-10-05', id: 'AL01YM' },
+    { row: 11, mission: 'SIM1', date: 'bad', id: 'ZZZ' },
+  ];
+  const out = rules.checkLog(log, ground, flying, TODAY);
+  assert.deepEqual(out.map((p) => [p.row, p.problem]), [
+    [2, 'Training ID not in either config tab, row ignored'],
+    [3, 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row'],
+    [5, 'date is after today, row still counted'],
+    [6, 'date is blank or not a date, row ignored'],
+    [7, 'date is blank or not a date, row ignored'],
+    [8, 'blank Training ID, row ignored'],
+    [11, 'Training ID not in either config tab, row ignored'],
+  ]);
+  assert.deepEqual(out[0], { row: 2, mission: '1234', date: '2026-10-02', id: 'AL01YN', problem: 'Training ID not in either config tab, row ignored' });
+});
+
+test('checkLog: a clean log reports nothing, and a date equal to today is fine', () => {
+  const ground = [{ id: 'G1', name: 'g', label: 'Annual' }];
+  const log = [
+    { row: 2, mission: '', date: TODAY, id: 'G1' },
+    { row: 3, mission: 'SIM', date: '2026-10-01', id: 'G1' },
+    { row: 4, mission: '0123', date: '2026-10-01', id: 'g1' },
+  ];
+  assert.deepEqual(rules.checkLog(log, ground, [], TODAY), []);
+});
+
 test('SUMMARY_HEADERS: Task ID leads, then the CLAUDE.md columns', () => {
   assert.deepEqual(rules.SUMMARY_HEADERS, [
     'Task ID', 'Task Name', 'Last Accomplished', 'Due Date', 'Overdue',

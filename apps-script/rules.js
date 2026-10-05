@@ -338,6 +338,38 @@ function buildSummary(ground, flying, log, today) {
   return out;
 }
 
+/**
+ * Log check: rows the summary could not use, and rows that look wrong.
+ *
+ * log:    [{ row, mission, date, id }] with row the sheet row number (optional)
+ * ground, flying: the config rows
+ * today:  'YYYY-MM-DD'
+ *
+ * Returns [{ row, mission, date, id, problem }], one problem per row, worst first:
+ * a blank or unknown Training ID or an unreadable date means the row was ignored;
+ * a future date or a SIM-looking Mission Number means the row was counted but is suspect.
+ */
+function checkLog(log, ground, flying, today) {
+  var known = {};
+  var events = ground.concat(flying);
+  for (var e = 0; e < events.length; e++) known[normaliseId(events[e].id)] = true;
+  var out = [];
+  for (var i = 0; i < log.length; i++) {
+    var entry = log[i];
+    var id = normaliseId(entry.id);
+    var date = parseDate(entry.date);
+    var mission = String(entry.mission == null ? '' : entry.mission).trim();
+    var problem = '';
+    if (id === '') problem = 'blank Training ID, row ignored';
+    else if (!known[id]) problem = 'Training ID not in either config tab, row ignored';
+    else if (!date) problem = 'date is blank or not a date, row ignored';
+    else if (today && formatDate(date) > today) problem = 'date is after today, row still counted';
+    else if (rowKind(mission) === 'aircraft' && /^sim/i.test(mission)) problem = 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row';
+    if (problem) out.push({ row: entry.row, mission: entry.mission, date: entry.date, id: entry.id, problem: problem });
+  }
+  return out;
+}
+
 /** Summary row object to an array in SUMMARY_HEADERS order. */
 function summaryRowToArray(row) {
   var arr = [];
@@ -369,6 +401,7 @@ if (typeof module !== 'undefined' && module.exports) {
     parseVolume: parseVolume,
     summarizeEvent: summarizeEvent,
     buildSummary: buildSummary,
+    checkLog: checkLog,
     summaryRowToArray: summaryRowToArray,
     formatPercent: formatPercent
   };
