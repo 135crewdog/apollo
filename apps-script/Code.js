@@ -165,6 +165,10 @@ function writeSummary(ss, rows) {
 
 function fillSummary(sheet, values) {
   sheet.clear();
+  // A filter or sort left on this tab by hand survives clear() and reorders
+  // rows under the next write. The tab is script-owned, so drop it.
+  var filter = sheet.getFilter();
+  if (filter) filter.remove();
   // Task Name .. Overdue are text so 'YYYY-MM-DD' and 'CHECK LABEL' are kept as written.
   sheet.getRange(1, 1, values.length, 5).setNumberFormat('@');
   if (values.length > 1) {

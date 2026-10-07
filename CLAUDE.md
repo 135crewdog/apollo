@@ -29,7 +29,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
 | `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Remaining, Remaining Sim Credit |
 
-**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab is lost on the next refresh because the tab is cleared and rewritten.
+**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab, a filter or sort included, is lost on the next refresh because the tab is cleared and rewritten. Sorting the summary by hand while a refresh runs once left eleven rows duplicated and eleven missing; the Status screen in the app is where the sorted view lives.
 
 ### Training Log
 
