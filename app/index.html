@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Apollo</title>
+<meta name="theme-color" content="#11161f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Apollo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Apollo</h1>
+  <div id="topline" class="topline" aria-live="polite"></div>
+</header>
+
+<main>
+  <section id="screen-log" class="screen">
+    <div class="seg" role="group" aria-label="Kind of training">
+      <button type="button" class="seg-btn" data-mode="flight">Flight</button>
+      <button type="button" class="seg-btn" data-mode="sim">Sim</button>
+      <button type="button" class="seg-btn" data-mode="ground">Ground</button>
+    </div>
+    <div class="fields">
+      <label id="mission-field">Mission Number
+        <input id="mission" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. 0123">
+      </label>
+      <label>Date (Zulu)
+        <input id="date" type="date" required>
+      </label>
+    </div>
+    <input id="search" type="search" placeholder="Search events" autocomplete="off" aria-label="Search events">
+    <ul id="events" class="events"></ul>
+    <div class="savebar">
+      <button type="button" id="save" class="primary" disabled>Save</button>
+    </div>
+  </section>
+
+  <section id="screen-status" class="screen hidden">
+    <p id="status-head" class="muted"></p>
+    <div id="logcheck"></div>
+    <ul id="summary" class="summary"></ul>
+  </section>
+
+  <section id="screen-settings" class="screen hidden">
+    <label>Web app URL
+      <input id="url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+    </label>
+    <label>Token
+      <input id="token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
+    </label>
+    <label class="check"><input id="show-token" type="checkbox"> Show token</label>
+    <div class="row">
+      <button type="button" id="save-settings" class="primary">Save</button>
+      <button type="button" id="sync-now">Sync now</button>
+    </div>
+    <p id="sync-status" class="muted"></p>
+    <button type="button" id="clear-data" class="danger">Clear local data</button>
+    <p class="muted small">Apollo <span id="version"></span>. All dates are Zulu.</p>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Screens">
+  <button type="button" data-tab="log">Log</button>
+  <button type="button" data-tab="status">Status</button>
+  <button type="button" data-tab="settings">Settings</button>
+</nav>
+
+<div id="toast" class="toast hidden" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

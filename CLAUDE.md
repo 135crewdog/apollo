@@ -15,7 +15,7 @@ Ask the user before adding anything that is not in this file. Ideas that were di
 | # | Scope | Status |
 |---|---|---|
 | 1 | `apps-script/rules.js`, `apps-script/Code.js`, `tests/`, `README.md`. Installed in the user's workbook and checked against test rows. | Done |
-| 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Next |
+| 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Built and tested in a browser; goes live when GitHub Pages is enabled on the repo (Settings → Pages → Source: GitHub Actions) and merged to main |
 | 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | After 2 |
 
 ## The workbook
@@ -187,12 +187,14 @@ Today is 2026-10-05 (FY27) in all of these. The tests compare the fraction, so "
 ## Architecture
 
 ```
-CLAUDE.md              this file, the spec
-README.md              install, token and deploy steps for the workbook script
-apps-script/rules.js   pure functions, no Apps Script globals, unit-tested in Node
-apps-script/Code.js    sheet reading/writing, refresh, menu, doGet, doPost
-app/                   the PWA: index.html, app.js, style.css, sw.js, manifest (milestone 2)
-tests/                 node --test
+CLAUDE.md                 this file, the spec
+README.md                 install, token and deploy steps for the workbook script; app setup
+apps-script/rules.js      pure functions, no Apps Script globals, unit-tested in Node
+apps-script/Code.js       sheet reading/writing, refresh, menu, doGet, doPost
+app/                      the PWA: index.html, app.js, style.css, sw.js, manifest.webmanifest, icons
+tests/*.test.js           node --test: rules.test.js and app.test.js (the app's pure helpers)
+tests/browser/            smoke.js drives the app in Chromium against mock-api.js; needs Playwright, dev only
+.github/workflows/        test.yml runs node --test; pages.yml publishes app/ to GitHub Pages from main
 ```
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
@@ -216,9 +218,15 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 ### The app (three screens)
 
-- **Log:** pick Flight, Sim or Ground. Flight needs a mission number and date. Sim needs a date and writes `SIM` as the mission number. Ground needs a date only. Then a searchable list of events from the matching config tab, each with + and −. Save writes one row per tap. In Sim, events with 0% sim credit are not offered.
-- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, and the log check problems if there are any.
-- **Settings:** web app URL, token, Sync now.
+- **Log:** pick Flight, Sim or Ground. Flight needs a mission number and date. Sim needs a date and writes `SIM` as the mission number. Ground needs a date only. Then a searchable list of events from the matching config tab, each with + and −. Save writes one row per tap. In Sim, events with 0% sim credit are not offered. The date defaults to the Zulu date. Flight refuses a mission number of `SIM`. Changing the kind clears the counts.
+- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, and the log check problems if there are any. Order within the list: Overdue rows, then `CHECK LABEL` rows, then rows with a due date ascending, then rows with no due date; ties keep config order. Each row shows the due date with the same colour bands as the sheet's Due Date column, Last Accomplished or "Never logged", and the volume line when the event has one.
+- **Settings:** web app URL, token, Save, Sync now, last sync time and last error, Clear local data (asks first; the workbook is never touched). The app opens on Settings until a URL and token are saved.
+
+**Sync.** Save puts the rows into the local queue as one batch with a fresh `batchId` and tries to sync at once. Sync sends queued batches in order with POST, then, if nothing was sent, refreshes with GET. It runs on load, after Save, when the browser comes back online, when the app becomes visible with rows waiting, and from Sync now. A network failure keeps the queue and says so; a `{ ok: false }` reply keeps the queue and shows the error. The payload from the last successful call is what Status shows.
+
+**Storage.** `localStorage` keys `apollo.settings` (`{ url, token }`), `apollo.data` (the last payload plus `lastSync`) and `apollo.queue` (`[{ batchId, rows }]`).
+
+**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline; API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or phones keep the old copy.
 
 ## Gotchas
 
@@ -229,6 +237,8 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 - **Volume Required** may arrive as a number, a numeric string, blank, or text such as `X`.
 - **Mission Number must be stored as plain text**, so values like `0123` or `1E5` are not altered by Sheets.
 - **POST with `Content-Type: text/plain`.** Apps Script does not answer CORS preflight requests, and `application/json` triggers one.
+- **A native date input shows the phone's date format** (10/07/2026 on a US phone) but its value is always `YYYY-MM-DD`; the app reads the value, never the display.
+- **Bump both version strings** (`sw.js` `VERSION`, `app.js` `APP_VERSION`) with every change under `app/`.
 - **No Google Sheets Tables anywhere in the workbook.** See "The workbook". Note for anyone touching the sheet through the Sheets API: `deleteTable` clears the Table's cells as well, so read the values first and write them back.
 - The summary tab is script-owned. Never put formulas or user data there.
 
