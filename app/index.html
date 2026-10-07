@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Apollo</title>
-<meta name="theme-color" content="#11161f">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Apollo">
@@ -14,63 +14,128 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <h1>Apollo</h1>
-  <div id="topline" class="topline" aria-live="polite"></div>
-</header>
+<div id="app" class="app">
 
-<main>
-  <section id="screen-log" class="screen">
-    <div class="seg" role="group" aria-label="Kind of training">
-      <button type="button" class="seg-btn" data-mode="flight">Flight</button>
-      <button type="button" class="seg-btn" data-mode="sim">Sim</button>
-      <button type="button" class="seg-btn" data-mode="ground">Ground</button>
+  <div id="view-main" class="view">
+    <header class="header">
+      <h1 class="title">Apollo</h1>
+      <button type="button" id="settings-btn" class="icon-btn" aria-label="Settings">&#9881;&#65039;</button>
+    </header>
+    <div class="seg-wrap">
+      <div class="seg-tabs" role="tablist" aria-label="Screens">
+        <button type="button" role="tab" data-tab="log">Log</button>
+        <button type="button" role="tab" data-tab="status">Status</button>
+      </div>
     </div>
-    <div class="fields">
-      <label id="mission-field">Mission Number
-        <input id="mission" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. 0123">
-      </label>
-      <label>Date (Zulu)
-        <input id="date" type="date" required>
-      </label>
+    <div id="panels" class="panels">
+      <div id="track" class="track">
+
+        <section id="screen-log" class="panel" aria-label="Log">
+          <div class="section">
+            <div class="section-title">Kind</div>
+            <div class="card">
+              <div class="toggle-group" role="group" aria-label="Kind of training">
+                <button type="button" data-mode="flight">Flight</button>
+                <button type="button" data-mode="sim">Sim</button>
+                <button type="button" data-mode="ground">Ground</button>
+              </div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Sortie</div>
+            <div class="card">
+              <div class="input-group" id="mission-field">
+                <label for="mission">Mission Number</label>
+                <input id="mission" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. 0123">
+              </div>
+              <div class="input-group last">
+                <label for="date">Date (Zulu)</label>
+                <input id="date" type="date" required>
+              </div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="section-title">Events</div>
+            <input id="search" type="search" class="search" placeholder="Search events" autocomplete="off" aria-label="Search events">
+            <div id="events"></div>
+          </div>
+          <div class="panel-end"></div>
+        </section>
+
+        <section id="screen-status" class="panel" aria-label="Status">
+          <div id="status-head" class="section-title"></div>
+          <div id="logcheck"></div>
+          <div id="status-error"></div>
+          <ul id="summary" class="card list"></ul>
+          <div class="panel-end"></div>
+        </section>
+
+      </div>
     </div>
-    <input id="search" type="search" placeholder="Search events" autocomplete="off" aria-label="Search events">
-    <ul id="events" class="events"></ul>
-    <div class="savebar">
-      <button type="button" id="save" class="primary" disabled>Save</button>
+    <div id="savebar" class="savebar">
+      <button type="button" id="save" class="btn primary" disabled>Save</button>
     </div>
-  </section>
+  </div>
 
-  <section id="screen-status" class="screen hidden">
-    <p id="status-head" class="muted"></p>
-    <div id="logcheck"></div>
-    <ul id="summary" class="summary"></ul>
-  </section>
-
-  <section id="screen-settings" class="screen hidden">
-    <label>Web app URL
-      <input id="url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
-    </label>
-    <label>Token
-      <input id="token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
-    </label>
-    <label class="check"><input id="show-token" type="checkbox"> Show token</label>
-    <div class="row">
-      <button type="button" id="save-settings" class="primary">Save</button>
-      <button type="button" id="sync-now">Sync now</button>
+  <div id="screen-settings" class="view hidden">
+    <header class="header header-center">
+      <button type="button" id="done" class="text-btn">Done</button>
+      <h1 class="title small">Settings</h1>
+      <span class="header-spacer" aria-hidden="true"></span>
+    </header>
+    <div class="panel">
+      <div class="section">
+        <div class="section-title">Connection</div>
+        <div class="card">
+          <div class="input-group">
+            <label for="url">Web app URL</label>
+            <input id="url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec">
+          </div>
+          <div class="input-group">
+            <label for="token">Token</label>
+            <input id="token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false">
+          </div>
+          <label class="check"><input id="show-token" type="checkbox"> Show token</label>
+          <div class="btn-row">
+            <button type="button" id="save-settings" class="btn primary">Save</button>
+            <button type="button" id="sync-now" class="btn secondary">Sync now</button>
+          </div>
+          <p id="sync-status" class="hint"></p>
+          <div id="settings-error"></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Appearance</div>
+        <div class="card">
+          <div class="setting-row last">
+            <label for="theme">Theme</label>
+            <select id="theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Data</div>
+        <div class="card">
+          <button type="button" id="clear-data" class="btn outline-destructive">Clear local data</button>
+          <p class="hint">Removes the saved summary, unsynced rows, URL and token from this phone. The workbook is never touched.</p>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Feedback</div>
+        <div class="card">
+          <a class="link" href="mailto:135crewdog.github@gmail.com?subject=Apollo%20App%20Feedback">Send Feedback</a>
+        </div>
+      </div>
+      <p class="version">Apollo v<span id="version"></span> · all dates are Zulu</p>
+      <div class="panel-end"></div>
     </div>
-    <p id="sync-status" class="muted"></p>
-    <button type="button" id="clear-data" class="danger">Clear local data</button>
-    <p class="muted small">Apollo <span id="version"></span>. All dates are Zulu.</p>
-  </section>
-</main>
+  </div>
 
-<nav class="tabs" aria-label="Screens">
-  <button type="button" data-tab="log">Log</button>
-  <button type="button" data-tab="status">Status</button>
-  <button type="button" data-tab="settings">Settings</button>
-</nav>
-
+</div>
 <div id="toast" class="toast hidden" role="status"></div>
 <script src="app.js"></script>
 </body>

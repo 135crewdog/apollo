@@ -54,7 +54,7 @@ The app is static files served from GitHub Pages. One hosted copy serves everyon
 
 1. Turn on Pages once: in the GitHub repo choose **Settings → Pages**, and under **Build and deployment** set **Source** to **GitHub Actions**. From then on every push to `main` that touches `app/` publishes to `https://135crewdog.github.io/apollo/`.
 2. Open that URL on the phone. On iPhone use **Share → Add to Home Screen**; on Android accept the install prompt or use the browser menu's **Install app**.
-3. The app opens on **Settings**. Paste the web app URL and the token, tap **Save**. It syncs at once and the **Status** screen fills in.
-4. **Log**: choose Flight, Sim or Ground, set the mission number and Zulu date, tap **+** on each event as many times as it was done, then **Save**. Rows go into the sheet when there is a connection and wait in the app until then. The header shows how many are waiting.
+3. The app opens on **Settings**. Paste the web app URL and the token, tap **Save**. It syncs at once. Tap **Done**, and the **Status** tab fills in. The gear in the top corner reopens Settings, where you can also pick Light, Dark or Auto.
+4. **Log**: choose Flight, Sim or Ground, set the mission number and Zulu date, tap **+** on each event as many times as it was done, then **Save**. Rows go into the sheet when there is a connection and wait in the app until then. Swipe or tap the segmented control to move between Log and Status; Status shows how many rows are waiting.
 
 When you change anything under `app/`, bump `VERSION` in `app/sw.js` and `APP_VERSION` in `app/app.js`, or phones keep the old copy.

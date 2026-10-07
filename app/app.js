@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.3';
+var APP_VERSION = '2026.10.07.4';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -177,57 +177,82 @@ if (typeof document !== 'undefined') {
       return node;
     }
 
-    var settings = load(STORAGE.settings, { url: '', token: '' });
+    var TABS = ['log', 'status'];
+    var settings = load(STORAGE.settings, { url: '', token: '', theme: 'auto' });
+    if (!settings.theme) settings.theme = 'auto';
     var data = load(STORAGE.data, { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' });
     var queue = load(STORAGE.queue, []);
-    var ui = { tab: 'log', mode: 'flight', query: '', counts: {}, syncing: false, lastError: '' };
+    var ui = { tab: 'log', mode: 'flight', query: '', counts: {}, syncing: false, lastError: '', settingsOpen: false };
     var toastTimer = null;
+
+    // ---- theme ----
+
+    var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+    function applyTheme() {
+      var root = document.documentElement;
+      root.setAttribute('data-theme', settings.theme);
+      root.classList.toggle('system-dark', !!(darkQuery && darkQuery.matches));
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--elev').trim() || '#ffffff');
+    }
+    if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
 
     // ---- rendering ----
 
     function render() {
+      $('view-main').classList.toggle('hidden', ui.settingsOpen);
+      $('screen-settings').classList.toggle('hidden', !ui.settingsOpen);
       renderTabs();
-      renderTopline();
       renderLog();
       renderStatus();
       renderSettings();
     }
 
     function renderTabs() {
-      document.querySelectorAll('.tabs button').forEach(function (b) {
-        b.classList.toggle('on', b.dataset.tab === ui.tab);
+      document.querySelectorAll('.seg-tabs button').forEach(function (b) {
+        var on = b.dataset.tab === ui.tab;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      ['log', 'status', 'settings'].forEach(function (name) {
-        $('screen-' + name).classList.toggle('hidden', ui.tab !== name);
-      });
+      $('track').style.transform = 'translateX(-' + (TABS.indexOf(ui.tab) * 100) + '%)';
+      $('savebar').classList.toggle('hidden', ui.tab !== 'log');
     }
 
-    function renderTopline() {
-      var pending = pendingRows(queue);
-      var parts = [];
-      if (pending) parts.push(pending + (pending === 1 ? ' row' : ' rows') + ' waiting to sync');
-      else if (ui.syncing) parts.push('Syncing…');
-      else if (data.asOf) parts.push('As of ' + data.asOf);
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) parts.push('offline');
-      $('topline').textContent = parts.join(' · ');
+    function changeTab(name) {
+      if (TABS.indexOf(name) === -1 || name === ui.tab) return;
+      ui.tab = name;
+      renderTabs();
+      var panel = $('screen-' + name);
+      setTimeout(function () { panel.scrollTop = 0; }, 100);
+    }
+
+    function pendingText() {
+      var n = pendingRows(queue);
+      return n + (n === 1 ? ' row' : ' rows') + ' waiting to sync';
     }
 
     function renderLog() {
-      document.querySelectorAll('.seg-btn').forEach(function (b) {
+      document.querySelectorAll('.toggle-group button').forEach(function (b) {
         b.classList.toggle('on', b.dataset.mode === ui.mode);
       });
       $('mission-field').classList.toggle('hidden', ui.mode !== 'flight');
       if (!$('date').value) $('date').value = todayUtc();
 
-      var events = filterEvents(eventsForMode(ui.mode, data), ui.query);
-      var list = $('events');
-      list.textContent = '';
-      if (!eventsForMode(ui.mode, data).length) {
-        list.appendChild(el('li', 'empty', data.asOf ? 'No events in this config tab.' : 'No config yet. Set the web app URL and token in Settings, then Sync now.'));
+      var all = eventsForMode(ui.mode, data);
+      var events = filterEvents(all, ui.query);
+      var box = $('events');
+      box.textContent = '';
+      if (!all.length) {
+        var ul = el('ul');
+        ul.appendChild(el('li', 'empty', data.asOf ? 'No events in this config tab.' : 'No config yet. Open Settings, enter the web app URL and token, then Sync now.'));
+        box.appendChild(ul);
       }
       groupEvents(events).forEach(function (g) {
-        list.appendChild(el('li', 'group', g.key));
-        g.events.forEach(function (e) { list.appendChild(eventItem(e)); });
+        box.appendChild(el('div', 'group', g.key));
+        var ul = el('ul');
+        g.events.forEach(function (e) { ul.appendChild(eventItem(e)); });
+        box.appendChild(ul);
       });
 
       var total = 0;
@@ -237,70 +262,79 @@ if (typeof document !== 'undefined') {
     }
 
     function eventItem(e) {
-        var n = ui.counts[e.id] || 0;
-        var li = el('li', 'event' + (n ? ' picked' : ''));
-        var name = el('div', 'name');
-        name.appendChild(el('b', null, e.name || e.id));
-        name.appendChild(el('span', null, e.id));
-        li.appendChild(name);
-        var counter = el('div', 'counter');
-        var minus = el('button', null, '−');
-        minus.type = 'button';
-        minus.dataset.id = e.id;
-        minus.dataset.delta = '-1';
-        minus.disabled = n === 0;
-        minus.setAttribute('aria-label', 'Remove one ' + (e.name || e.id));
-        var count = el('span', 'n' + (n ? '' : ' zero'), String(n));
-        var plus = el('button', null, '+');
-        plus.type = 'button';
-        plus.dataset.id = e.id;
-        plus.dataset.delta = '1';
-        plus.setAttribute('aria-label', 'Add one ' + (e.name || e.id));
-        counter.appendChild(minus);
-        counter.appendChild(count);
-        counter.appendChild(plus);
-        li.appendChild(counter);
-        return li;
+      var n = ui.counts[e.id] || 0;
+      var li = el('li', 'event' + (n ? ' picked' : ''));
+      var name = el('div', 'name');
+      name.appendChild(el('b', null, e.name || e.id));
+      name.appendChild(el('span', null, e.id));
+      li.appendChild(name);
+      var stepper = el('div', 'stepper');
+      var minus = el('button', null, '−');
+      minus.type = 'button';
+      minus.dataset.id = e.id;
+      minus.dataset.delta = '-1';
+      minus.disabled = n === 0;
+      minus.setAttribute('aria-label', 'Remove one ' + (e.name || e.id));
+      var count = el('span', 'n' + (n ? '' : ' zero'), String(n));
+      var plus = el('button', null, '+');
+      plus.type = 'button';
+      plus.dataset.id = e.id;
+      plus.dataset.delta = '1';
+      plus.setAttribute('aria-label', 'Add one ' + (e.name || e.id));
+      stepper.appendChild(minus);
+      stepper.appendChild(count);
+      stepper.appendChild(plus);
+      li.appendChild(stepper);
+      return li;
+    }
+
+    function banner(kind, text, items) {
+      var b = el('div', 'banner ' + kind);
+      b.setAttribute('role', 'alert');
+      b.appendChild(el('div', null, text));
+      if (items && items.length) {
+        var ul = el('ul');
+        items.forEach(function (t) { ul.appendChild(el('li', null, t)); });
+        b.appendChild(ul);
+      }
+      return b;
     }
 
     function renderStatus() {
       var head = [];
       if (data.asOf) head.push('As of ' + data.asOf);
-      var pending = pendingRows(queue);
-      head.push(pending + (pending === 1 ? ' row' : ' rows') + ' waiting to sync');
-      if (ui.lastError) head.push(ui.lastError);
+      head.push(pendingText());
       $('status-head').textContent = head.join(' · ');
 
       var lc = $('logcheck');
       lc.textContent = '';
       if (data.logCheck && data.logCheck.length) {
-        var card = el('div', 'card warn');
-        card.appendChild(el('b', null, data.logCheck.length + ' log ' + (data.logCheck.length === 1 ? 'row needs' : 'rows need') + ' attention in the sheet'));
-        var ul = el('ul');
-        data.logCheck.forEach(function (p) {
-          ul.appendChild(el('li', null, 'Row ' + p.row + ': ' + p.problem + ' (' + [p.mission, p.date, p.id].join(' | ') + ')'));
-        });
-        card.appendChild(ul);
-        lc.appendChild(card);
+        var n = data.logCheck.length;
+        lc.appendChild(banner('warn', n + ' log ' + (n === 1 ? 'row needs' : 'rows need') + ' attention in the sheet', data.logCheck.map(function (p) {
+          return 'Row ' + p.row + ': ' + p.problem + ' (' + [p.mission, p.date, p.id].join(' | ') + ')';
+        })));
       }
+      var se = $('status-error');
+      se.textContent = '';
+      if (ui.lastError) se.appendChild(banner('error', ui.lastError));
 
       var list = $('summary');
       list.textContent = '';
       if (!data.summary || !data.summary.length) {
-        list.appendChild(el('li', 'empty', 'No summary yet. Set the web app URL and token in Settings, then Sync now.'));
+        list.appendChild(el('li', 'empty', 'No summary yet. Open Settings, enter the web app URL and token, then Sync now.'));
         return;
       }
       var today = todayUtc();
       sortSummary(data.summary).forEach(function (r) {
         var band = dueBand(r, today);
-        var li = el('li', 'item' + (band ? ' band-' + band : ''));
+        var li = el('li', 'item');
         var head = el('div', 'head');
         var left = el('div');
         left.appendChild(el('div', 'id', String(r['Task ID'])));
         left.appendChild(el('div', 'name', String(r['Task Name'] || '')));
         head.appendChild(left);
-        var dueText = r['Overdue'] === 'YES' && !r['Due Date'] ? 'OVERDUE' : r['Due Date'] || 'No due date';
-        if (r['Overdue'] === 'YES' && r['Due Date']) dueText = 'OVERDUE ' + r['Due Date'];
+        var dueText = r['Due Date'] || 'No due date';
+        if (r['Overdue'] === 'YES') dueText = r['Due Date'] ? 'OVERDUE ' + r['Due Date'] : 'OVERDUE';
         head.appendChild(el('div', 'due' + (band ? ' band-' + band : ''), dueText));
         li.appendChild(head);
         var vol = volumeText(r);
@@ -314,12 +348,16 @@ if (typeof document !== 'undefined') {
       if (document.activeElement !== $('url')) $('url').value = settings.url || '';
       if (document.activeElement !== $('token')) $('token').value = settings.token || '';
       $('token').type = $('show-token').checked ? 'text' : 'password';
+      $('theme').value = settings.theme;
       var s = [];
       if (ui.syncing) s.push('Syncing…');
       else if (data.lastSync) s.push('Last sync ' + data.lastSync + 'Z');
       else s.push('Not synced yet');
-      if (ui.lastError) s.push(ui.lastError);
+      if (pendingRows(queue)) s.push(pendingText());
       $('sync-status').textContent = s.join(' · ');
+      var se = $('settings-error');
+      se.textContent = '';
+      if (ui.lastError) se.appendChild(banner('error', ui.lastError));
       $('version').textContent = APP_VERSION;
     }
 
@@ -370,10 +408,15 @@ if (typeof document !== 'undefined') {
       save(STORAGE.data, data);
     }
 
+    function check(payload) {
+      if (!payload || payload.ok !== true) throw new Error((payload && payload.error) || 'The web app returned an error.');
+      return payload;
+    }
+
     function sync() {
       if (ui.syncing) return Promise.resolve();
       if (!settings.url || !settings.token) {
-        ui.lastError = 'Set the web app URL and token in Settings.';
+        ui.lastError = 'Enter the web app URL and token.';
         render();
         return Promise.resolve();
       }
@@ -396,8 +439,8 @@ if (typeof document !== 'undefined') {
         .then(function () { ui.lastError = ''; })
         .catch(function (err) {
           var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-          ui.lastError = offline ? 'Offline. Rows are saved and will sync later.' : (err && err.message) || 'Sync failed';
-          if (!offline && err instanceof TypeError) ui.lastError = 'No connection. Rows are saved and will sync later.';
+          if (offline || err instanceof TypeError) ui.lastError = 'No connection. Rows are saved on this phone and will sync later.';
+          else ui.lastError = (err && err.message) || 'Sync failed';
         })
         .then(function () {
           ui.syncing = false;
@@ -405,26 +448,41 @@ if (typeof document !== 'undefined') {
         });
     }
 
-    function check(payload) {
-      if (!payload || payload.ok !== true) throw new Error((payload && payload.error) || 'The web app returned an error.');
-      return payload;
-    }
-
     // ---- events ----
 
-    document.querySelector('.tabs').addEventListener('click', function (e) {
+    document.querySelector('.seg-tabs').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-tab]');
-      if (!b) return;
-      ui.tab = b.dataset.tab;
-      render();
+      if (b) changeTab(b.dataset.tab);
     });
 
-    document.querySelector('.seg').addEventListener('click', function (e) {
+    // Swipe between Log and Status, as in Show Time: horizontal movement must dominate.
+    var touch = { x: null, y: null, ex: null, ey: null };
+    var panels = $('panels');
+    panels.addEventListener('touchstart', function (e) {
+      touch.ex = touch.ey = null;
+      touch.x = e.targetTouches[0].clientX;
+      touch.y = e.targetTouches[0].clientY;
+    }, { passive: true });
+    panels.addEventListener('touchmove', function (e) {
+      touch.ex = e.targetTouches[0].clientX;
+      touch.ey = e.targetTouches[0].clientY;
+    }, { passive: true });
+    panels.addEventListener('touchend', function () {
+      if (touch.x == null || touch.ex == null) return;
+      var dx = touch.x - touch.ex;
+      var dy = Math.abs((touch.y || 0) - (touch.ey || 0));
+      if (dy > Math.abs(dx) * 0.75) return;
+      var i = TABS.indexOf(ui.tab);
+      if (dx > 50 && i < TABS.length - 1) changeTab(TABS[i + 1]);
+      if (dx < -50 && i > 0) changeTab(TABS[i - 1]);
+    });
+
+    document.querySelector('.toggle-group').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-mode]');
       if (!b || b.dataset.mode === ui.mode) return;
       ui.mode = b.dataset.mode;
       ui.counts = {};
-      render();
+      renderLog();
     });
 
     $('search').addEventListener('input', function (e) {
@@ -445,6 +503,8 @@ if (typeof document !== 'undefined') {
     $('save').addEventListener('click', function () {
       var events = eventsForMode(ui.mode, data);
       var built = buildRows(ui.mode, $('mission').value, $('date').value, ui.counts, events);
+      $('mission').classList.toggle('error', !!built.error && /mission|Sim button/.test(built.error));
+      $('date').classList.toggle('error', !!built.error && /YYYY-MM-DD/.test(built.error));
       if (built.error) {
         toast(built.error);
         return;
@@ -458,6 +518,9 @@ if (typeof document !== 'undefined') {
       sync();
     });
 
+    $('settings-btn').addEventListener('click', function () { ui.settingsOpen = true; render(); });
+    $('done').addEventListener('click', function () { ui.settingsOpen = false; render(); });
+
     $('save-settings').addEventListener('click', function () {
       settings.url = $('url').value.trim();
       settings.token = $('token').value.trim();
@@ -469,6 +532,12 @@ if (typeof document !== 'undefined') {
     $('show-token').addEventListener('change', renderSettings);
     $('sync-now').addEventListener('click', function () { sync(); });
 
+    $('theme').addEventListener('change', function (e) {
+      settings.theme = e.target.value;
+      save(STORAGE.settings, settings);
+      applyTheme();
+    });
+
     $('clear-data').addEventListener('click', function () {
       var pending = pendingRows(queue);
       var msg = pending
@@ -476,7 +545,8 @@ if (typeof document !== 'undefined') {
         : 'This deletes the saved summary and the URL and token on this phone. The workbook is untouched. Continue?';
       if (!window.confirm(msg)) return;
       Object.keys(STORAGE).forEach(function (k) { try { localStorage.removeItem(STORAGE[k]); } catch (err) { /* ignore */ } });
-      settings = { url: '', token: '' };
+      settings = { url: '', token: '', theme: settings.theme };
+      save(STORAGE.settings, settings);
       data = { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' };
       queue = [];
       ui.counts = {};
@@ -493,8 +563,9 @@ if (typeof document !== 'undefined') {
 
     // ---- start ----
 
+    applyTheme();
     $('date').value = todayUtc();
-    if (!settings.url || !settings.token) ui.tab = 'settings';
+    if (!settings.url || !settings.token) ui.settingsOpen = true;
     render();
     if (settings.url && settings.token) sync();
 
