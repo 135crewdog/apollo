@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.4';
+var APP_VERSION = '2026.10.07.5';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,15 @@ function isIsoDate(s) {
   var leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
   var dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
   return d <= dim;
+}
+
+var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** 'YYYY-MM-DD' shown to a human as DD-Mmm-YY, e.g. '07-Oct-26'. Anything else is returned as is. */
+function formatDisplayDate(iso) {
+  if (!isIsoDate(iso)) return iso == null ? '' : String(iso);
+  var p = iso.split('-');
+  return p[2] + '-' + MONTHS[Number(p[1]) - 1] + '-' + p[0].slice(2);
 }
 
 /** Whole days from a to b, both 'YYYY-MM-DD', on UTC calendar numbers. Display only. */
@@ -238,6 +247,7 @@ if (typeof document !== 'undefined') {
       });
       $('mission-field').classList.toggle('hidden', ui.mode !== 'flight');
       if (!$('date').value) $('date').value = todayUtc();
+      $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date';
 
       var all = eventsForMode(ui.mode, data);
       var events = filterEvents(all, ui.query);
@@ -311,7 +321,7 @@ if (typeof document !== 'undefined') {
       if (data.logCheck && data.logCheck.length) {
         var n = data.logCheck.length;
         lc.appendChild(banner('warn', n + ' log ' + (n === 1 ? 'row needs' : 'rows need') + ' attention in the sheet', data.logCheck.map(function (p) {
-          return 'Row ' + p.row + ': ' + p.problem + ' (' + [p.mission, p.date, p.id].join(' | ') + ')';
+          return 'Row ' + p.row + ': ' + p.problem + ' (' + [p.mission, formatDisplayDate(p.date), p.id].join(' | ') + ')';
         })));
       }
       var se = $('status-error');
@@ -329,16 +339,17 @@ if (typeof document !== 'undefined') {
         var band = dueBand(r, today);
         var li = el('li', 'item');
         var head = el('div', 'head');
-        var left = el('div');
+        var left = el('div', 'label');
+        left.appendChild(el('div', 'name', String(r['Task Name'] || r['Task ID'])));
         left.appendChild(el('div', 'id', String(r['Task ID'])));
-        left.appendChild(el('div', 'name', String(r['Task Name'] || '')));
         head.appendChild(left);
-        var dueText = r['Due Date'] || 'No due date';
-        if (r['Overdue'] === 'YES') dueText = r['Due Date'] ? 'OVERDUE ' + r['Due Date'] : 'OVERDUE';
+        var due = r['Due Date'];
+        var dueText = isIsoDate(due) ? formatDisplayDate(due) : (due || 'No due date');
+        if (r['Overdue'] === 'YES') dueText = isIsoDate(due) ? 'OVERDUE ' + formatDisplayDate(due) : 'OVERDUE';
         head.appendChild(el('div', 'due' + (band ? ' band-' + band : ''), dueText));
         li.appendChild(head);
         var vol = volumeText(r);
-        var last = r['Last Accomplished'] ? 'Last ' + r['Last Accomplished'] : 'Never logged';
+        var last = r['Last Accomplished'] ? 'Last ' + formatDisplayDate(r['Last Accomplished']) : 'Never logged';
         li.appendChild(el('div', 'vol', vol ? last + ' · ' + vol : last));
         list.appendChild(li);
       });
@@ -351,7 +362,7 @@ if (typeof document !== 'undefined') {
       $('theme').value = settings.theme;
       var s = [];
       if (ui.syncing) s.push('Syncing…');
-      else if (data.lastSync) s.push('Last sync ' + data.lastSync + 'Z');
+      else if (data.lastSync) s.push('Last sync ' + formatDisplayDate(data.lastSync.slice(0, 10)) + ' ' + data.lastSync.slice(11) + 'Z');
       else s.push('Not synced yet');
       if (pendingRows(queue)) s.push(pendingText());
       $('sync-status').textContent = s.join(' · ');
@@ -485,6 +496,9 @@ if (typeof document !== 'undefined') {
       renderLog();
     });
 
+    $('date').addEventListener('input', function () { $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date'; });
+    $('date').addEventListener('change', function () { $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date'; });
+
     $('search').addEventListener('input', function (e) {
       ui.query = e.target.value;
       renderLog();
@@ -580,6 +594,7 @@ if (typeof module !== 'undefined' && module.exports) {
     APP_VERSION: APP_VERSION,
     todayUtc: todayUtc,
     isIsoDate: isIsoDate,
+    formatDisplayDate: formatDisplayDate,
     daysBetween: daysBetween,
     dueBand: dueBand,
     statusGroup: statusGroup,
