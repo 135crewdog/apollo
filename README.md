@@ -1,17 +1,20 @@
 # Apollo
 
-Personal KC-135 aircrew training tracker. `CLAUDE.md` is the spec. Milestone 1 (the rules and the workbook script) is done; the phone app is milestone 2.
+Personal KC-135 aircrew training tracker. `CLAUDE.md` is the spec. Milestone 1 is the rules and the workbook script. Milestone 2 is the phone app in `app/`.
 
 ```
-apps-script/rules.js   pure functions: due dates, which rows count, summary columns
+apps-script/rules.js   pure functions: due dates, which rows count, summary columns, log check
 apps-script/Code.js    sheet reading/writing, refresh, Apollo menu, doGet, doPost
-tests/                 node --test
+app/                   the phone app (PWA): plain HTML, CSS and JS, no build step
+tests/                 node --test, plus a browser smoke test in tests/browser/
 ```
 
 ## Run the tests
 
 ```
 node --test
+node tests/browser/smoke.js            # needs Playwright with Chromium; drives the app against a mock API
+node tests/browser/smoke.js ./shots    # same, and saves a screenshot of each screen
 ```
 
 ## Install the script in the workbook
@@ -44,3 +47,14 @@ Paste `WEB_APP_URL?token=YOUR_TOKEN` into a browser. The reply is JSON:
 
 - `GET ?token=…` refreshes the summary and returns the payload above.
 - `POST` with `Content-Type: text/plain` and body `{ "token": "…", "batchId": "…", "rows": [{ "mission": "", "date": "YYYY-MM-DD", "id": "…" }] }` appends the rows to the Training Log, refreshes, and returns the same payload. `mission` is blank for ground training, `SIM` for the simulator, or the mission number. The last 50 `batchId` values are remembered, so a retried POST with the same `batchId` appends nothing and still returns success.
+
+## The phone app
+
+The app is static files served from GitHub Pages. One hosted copy serves everyone; each person's data stays in their own workbook.
+
+1. Turn on Pages once: in the GitHub repo choose **Settings → Pages**, and under **Build and deployment** set **Source** to **GitHub Actions**. From then on every push to `main` that touches `app/` publishes to `https://135crewdog.github.io/apollo/`.
+2. Open that URL on the phone. On iPhone use **Share → Add to Home Screen**; on Android accept the install prompt or use the browser menu's **Install app**.
+3. The app opens on **Settings**. Paste the web app URL and the token, tap **Save**. It syncs at once and the **Status** screen fills in.
+4. **Log**: choose Flight, Sim or Ground, set the mission number and Zulu date, tap **+** on each event as many times as it was done, then **Save**. Rows go into the sheet when there is a connection and wait in the app until then. The header shows how many are waiting.
+
+When you change anything under `app/`, bump `VERSION` in `app/sw.js` and `APP_VERSION` in `app/app.js`, or phones keep the old copy.
