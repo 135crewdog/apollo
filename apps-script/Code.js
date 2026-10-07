@@ -32,7 +32,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Apollo')
     .addItem('Refresh', 'refresh')
-    .addItem('Connect phone', 'connectPhone')
+    .addItem('Connect device', 'connectDevice')
     .addToUi();
   safeRefresh();
 }
@@ -78,7 +78,7 @@ function describeLogCheck(logCheck, logRows) {
 }
 
 // ---------------------------------------------------------------------------
-// Connect phone: a one-tap link that carries the web app URL and token into the app
+// Connect device: a one-tap link that carries the web app URL and token into the app
 // ---------------------------------------------------------------------------
 
 /** The app URL with the connection in the fragment, which browsers never send to a server. */
@@ -99,7 +99,7 @@ function escapeHtml(s) {
 }
 
 /** Menu entry: show the handoff link, or what is still missing before one can exist. */
-function connectPhone() {
+function connectDevice() {
   var token = PropertiesService.getScriptProperties().getProperty(PROP_TOKEN) || '';
   var url = webAppUrl();
   var missing = [];
@@ -111,17 +111,17 @@ function connectPhone() {
     'button{background:#EA9999;color:#1c1c1e}a.btn{background:#e5e5ea;color:#1c1c1e}p{margin:0 0 10px}.note{color:#8e8e93;font-size:13px}</style>';
   var body;
   if (missing.length) {
-    body = '<p>Two things make the link, and this workbook is missing one:</p><p>' + missing.map(escapeHtml).join('</p><p>') + '</p><p class="note">Then open Apollo \u2192 Connect phone again.</p>';
+    body = '<p>Two things make the link, and this workbook is missing one:</p><p>' + missing.map(escapeHtml).join('</p><p>') + '</p><p class="note">Then open Apollo \u2192 Connect device again.</p>';
   } else {
     var link = buildHandoffLink(APP_URL, url, token);
-    body = '<p>Open this link on your phone. Apollo opens with this workbook\u2019s connection filled in, and you can add it to your home screen from there.</p>' +
+    body = '<p>Open this link on the device that will run Apollo. The app opens with this workbook\u2019s connection filled in, and you can add it to the home screen from there.</p>' +
       '<textarea id="link" readonly>' + escapeHtml(link) + '</textarea>' +
       '<button onclick="copy()">Copy link</button><a class="btn" href="' + escapeHtml(link) + '" target="_blank" rel="noopener">Open on this device</a>' +
       '<p class="note" style="margin-top:12px">The link holds your token. Send it only to yourself.</p>' +
       '<script>function copy(){var t=document.getElementById("link");t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand("copy")}document.querySelector("button").textContent="Copied"}</script>';
   }
   var output = HtmlService.createHtmlOutput(style + body).setWidth(560).setHeight(missing.length ? 240 : 320);
-  SpreadsheetApp.getUi().showModalDialog(output, 'Connect phone');
+  SpreadsheetApp.getUi().showModalDialog(output, 'Connect device');
 }
 
 // ---------------------------------------------------------------------------

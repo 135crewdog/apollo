@@ -20,7 +20,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 function serveApp() {
   return http.createServer((req, res) => {
     let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-    if (p === '/') p = '/index.html';
+    if (p.endsWith('/')) p += 'index.html';
     const file = path.join(APP_DIR, p);
     if (!file.startsWith(APP_DIR) || !fs.existsSync(file)) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -55,7 +55,7 @@ async function main() {
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   const shots = process.argv[2];
   // Panels slide for 300 ms, so let a screenshot wait for the transition to finish.
-  const shot = async (name) => { if (shots) { await page.waitForTimeout(400); await page.screenshot({ path: path.join(shots, name + '.png') }); } };
+  const shot = async (name, p = page) => { if (shots) { await p.waitForTimeout(400); await p.screenshot({ path: path.join(shots, name + '.png') }); } };
 
   try {
     await page.goto(appUrl);
@@ -162,6 +162,25 @@ async function main() {
     await p2.click('#settings-btn');
     assert.equal(await p2.inputValue('#url'), apiUrl, 'url saved from the handoff');
     await fresh.close();
+
+    // The guide page: loads under the app's scope, fetches the two script files, and the
+    // service worker does not swap it for the app shell.
+    const guide = await context.newPage();
+    guide.on('pageerror', (e) => errors.push(e.message));
+    await guide.route('https://raw.githubusercontent.com/**', (route) => {
+      const name = route.request().url().split('/').pop();
+      route.fulfill({ status: 200, contentType: 'text/plain', headers: { 'Access-Control-Allow-Origin': '*' }, body: fs.readFileSync(path.join(__dirname, '..', '..', 'apps-script', name), 'utf8') });
+    });
+    await guide.goto(appUrl + 'guide/');
+    assert.equal(await guide.title(), 'Apollo setup guide', 'guide page served, not the app shell');
+    await guide.waitForFunction(() => !document.getElementById('code-js').classList.contains('loading') && !document.getElementById('rules-js').classList.contains('loading'));
+    assert.ok((await guide.textContent('#code-js')).includes('function doPost'), 'Code.js shown');
+    assert.ok((await guide.textContent('#rules-js')).includes('function dueDate'), 'rules.js shown');
+    assert.match(await guide.getAttribute('#template-link', 'href'), /\/copy$/, 'template copy link');
+    await guide.reload();
+    assert.equal(await guide.title(), 'Apollo setup guide', 'guide still served after the service worker is active');
+    await shot('guide', guide);
+    await guide.close();
 
     assert.deepEqual(errors, [], 'no page errors');
     console.log('browser smoke test passed');
