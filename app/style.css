@@ -50,7 +50,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg);
+  /* As in Show Time: the page behind the 430px column is the elevated colour, so on a wide
+     screen the app reads as a phone-shaped panel. On a phone the column fills the screen. */
+  background: var(--elev);
   color: var(--text);
   overflow: hidden;
   touch-action: pan-y;
@@ -71,6 +73,7 @@ button, input, select { touch-action: manipulation; }
   display: flex;
   flex-direction: column;
   position: relative;
+  background: var(--bg);
 }
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
 .view.hidden, .hidden { display: none; }
