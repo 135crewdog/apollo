@@ -157,6 +157,20 @@ Ground rows leave all four volume columns blank.
 
 In the sheet, Task ID through Overdue are written as plain text, so dates stay `YYYY-MM-DD` and `CHECK LABEL` stays as written. The numeric columns are numbers.
 
+### Due Date colours
+
+The script writes conditional formatting on the Due Date column on every refresh, so it survives the rewrite and travels with the template. Display only; no rule lives here. First match wins.
+
+| Band | Test | Colour |
+|---|---|---|
+| Overdue | Overdue column is `YES` (so never-logged events go grey too) | `#666666` background, white text |
+| Due in 30 days or less | Due Date minus TODAY() is 30 or less | `#EA9999` |
+| Due in 60 days or less | 60 or less | `#F9CB9C` |
+| Due in 90 days or less | 90 or less | `#FFF2CC` |
+| More than 90 days, no due date, `CHECK LABEL` | | none |
+
+Sheets evaluates TODAY() in the workbook's time zone, which is UTC. Columns are referenced by their position in the header list, not hardcoded letters.
+
 ### Required test cases for volume
 
 Today is 2026-10-05 (FY27) in all of these. The tests compare the fraction, so "50%" means 0.5.
@@ -183,7 +197,7 @@ tests/                 node --test
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
 - **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code.
-- **Refresh** rewrites the Individual Training Summary and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
+- **Refresh** rewrites the Individual Training Summary, reapplies its Due Date colours, and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
 - **The app is offline-first.** A log entry goes into a local queue at once and syncs when there is a connection. Config, summary and queue are kept in `localStorage`.
 
 ### Web app API

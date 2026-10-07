@@ -121,6 +121,61 @@ function fillSummary(sheet, values) {
   }
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
   sheet.setFrozenRows(1);
+  colourDueDates(sheet, values.length - 1);
+}
+
+/**
+ * Due Date colours, display only: no rule lives here. Sheets evaluates these
+ * with TODAY() in the workbook's time zone, which is UTC. First match wins.
+ */
+var DUE_SOON_BANDS = [
+  { days: 30, background: '#EA9999' },
+  { days: 60, background: '#F9CB9C' },
+  { days: 90, background: '#FFF2CC' }
+];
+var OVERDUE_BACKGROUND = '#666666';
+var OVERDUE_FONT = '#FFFFFF';
+
+function colourDueDates(sheet, rowCount) {
+  if (rowCount < 1) {
+    sheet.setConditionalFormatRules([]);
+    return;
+  }
+  var dueCol = SUMMARY_HEADERS.indexOf('Due Date') + 1;
+  var overdueCol = SUMMARY_HEADERS.indexOf('Overdue') + 1;
+  var range = sheet.getRange(2, dueCol, rowCount, 1);
+  var due = '$' + columnLetter(dueCol) + '2';
+  var overdue = '$' + columnLetter(overdueCol) + '2';
+  var rules = [
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=' + overdue + '="YES"')
+      .setBackground(OVERDUE_BACKGROUND)
+      .setFontColor(OVERDUE_FONT)
+      .setRanges([range])
+      .build()
+  ];
+  for (var i = 0; i < DUE_SOON_BANDS.length; i++) {
+    var band = DUE_SOON_BANDS[i];
+    rules.push(
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied('=AND(' + overdue + '<>"YES", IFERROR(DATEVALUE(' + due + ') - TODAY(), 999) <= ' + band.days + ')')
+        .setBackground(band.background)
+        .setRanges([range])
+        .build()
+    );
+  }
+  sheet.setConditionalFormatRules(rules);
+}
+
+/** 1 -> A, 27 -> AA. */
+function columnLetter(col) {
+  var s = '';
+  while (col > 0) {
+    var rem = (col - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    col = (col - 1 - rem) / 26;
+  }
+  return s;
 }
 
 // ---------------------------------------------------------------------------
