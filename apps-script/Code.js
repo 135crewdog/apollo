@@ -14,7 +14,7 @@ var TAB_GROUND = 'Ground Training Config';
 var TAB_FLYING = 'Flying Training Config';
 var TAB_SUMMARY = 'Individual Training Summary';
 
-var LOG_HEADERS = ['Mission Number', 'Date', 'Training ID'];
+var LOG_HEADERS = ['Training ID', 'Date', 'Mission Number'];
 var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
@@ -273,7 +273,7 @@ function ensureLogHeaders(sheet) {
   }
   if (empty) {
     sheet.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS]);
-    sheet.getRange(1, 1, sheet.getMaxRows(), 1).setNumberFormat('@');
+    sheet.getRange(1, LOG_HEADERS.indexOf('Mission Number') + 1, sheet.getMaxRows(), 1).setNumberFormat('@');
     sheet.setFrozenRows(1);
   }
 }

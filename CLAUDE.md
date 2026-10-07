@@ -24,7 +24,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 
 | Tab | Written by | Columns |
 |---|---|---|
-| `Training Log` | the app, and the user by hand | Mission Number, Date, Training ID |
+| `Training Log` | the app, and the user by hand | Training ID, Date, Mission Number |
 | `Ground Training Config` | the user | Task ID, Task Name, Frequency |
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
 | `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Remaining, Remaining Sim Credit |
@@ -59,7 +59,7 @@ Rows with both a blank ID and a blank date are skipped silently. The report goes
 ### Config tabs
 
 - A row being present is what makes an event tracked. There is no profile tab and no crew position, FTL, or equipment setting. The user has already copied their own column of the RTM into these tabs.
-- Task IDs are unique across both tabs. Rows with a blank Task ID are skipped.
+- Task IDs are unique across both tabs. Rows with a blank Task ID are skipped. Every tab leads with the Task ID / Training ID column.
 - The Individual Training Summary lists every Ground row, then every Flying row, in config order.
 
 ### When the RTM changes
