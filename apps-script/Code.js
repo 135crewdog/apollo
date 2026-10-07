@@ -18,6 +18,7 @@ var LOG_HEADERS = ['Training ID', 'Date', 'Mission Number'];
 var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
+var APP_URL = 'https://135crewdog.github.io/apollo/';
 var PROP_TOKEN = 'APOLLO_TOKEN';
 var PROP_BATCH_IDS = 'APOLLO_BATCH_IDS';
 var BATCH_IDS_KEPT = 50;
@@ -28,7 +29,11 @@ var LOCK_WAIT_MS = 30000;
 // ---------------------------------------------------------------------------
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('Apollo').addItem('Refresh', 'refresh').addToUi();
+  SpreadsheetApp.getUi()
+    .createMenu('Apollo')
+    .addItem('Refresh', 'refresh')
+    .addItem('Connect phone', 'connectPhone')
+    .addToUi();
   safeRefresh();
 }
 
@@ -70,6 +75,53 @@ function describeLogCheck(logCheck, logRows) {
   }
   if (logCheck.length > LOG_CHECK_TOAST_LINES) lines.push('and ' + (logCheck.length - LOG_CHECK_TOAST_LINES) + ' more');
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Connect phone: a one-tap link that carries the web app URL and token into the app
+// ---------------------------------------------------------------------------
+
+/** The app URL with the connection in the fragment, which browsers never send to a server. */
+function buildHandoffLink(appUrl, webAppUrl, token) {
+  return appUrl + '#url=' + encodeURIComponent(webAppUrl) + '&token=' + encodeURIComponent(token);
+}
+
+/** The deployed web app URL, or '' before the first deployment. */
+function webAppUrl() {
+  var url = ScriptApp.getService().getUrl();
+  return url ? String(url).replace(/\/dev$/, '/exec') : '';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+/** Menu entry: show the handoff link, or what is still missing before one can exist. */
+function connectPhone() {
+  var token = PropertiesService.getScriptProperties().getProperty(PROP_TOKEN) || '';
+  var url = webAppUrl();
+  var missing = [];
+  if (!token) missing.push('Set ' + PROP_TOKEN + ' in Project Settings \u2192 Script Properties (lowercase letters and digits only).');
+  if (!url) missing.push('Deploy the web app: Deploy \u2192 New deployment \u2192 Web app, Execute as Me, Who has access: Anyone.');
+  var style = '<style>body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1c1c1e;margin:0;padding:16px}' +
+    'textarea{width:100%;box-sizing:border-box;height:88px;font:13px/1.4 Menlo,Consolas,monospace;padding:8px;border:1px solid #c6c6c8;border-radius:8px;resize:none}' +
+    'button,a.btn{display:inline-block;font:600 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:10px 16px;border-radius:10px;border:0;cursor:pointer;text-decoration:none;margin:10px 8px 0 0}' +
+    'button{background:#EA9999;color:#1c1c1e}a.btn{background:#e5e5ea;color:#1c1c1e}p{margin:0 0 10px}.note{color:#8e8e93;font-size:13px}</style>';
+  var body;
+  if (missing.length) {
+    body = '<p>Two things make the link, and this workbook is missing one:</p><p>' + missing.map(escapeHtml).join('</p><p>') + '</p><p class="note">Then open Apollo \u2192 Connect phone again.</p>';
+  } else {
+    var link = buildHandoffLink(APP_URL, url, token);
+    body = '<p>Open this link on your phone. Apollo opens with this workbook\u2019s connection filled in, and you can add it to your home screen from there.</p>' +
+      '<textarea id="link" readonly>' + escapeHtml(link) + '</textarea>' +
+      '<button onclick="copy()">Copy link</button><a class="btn" href="' + escapeHtml(link) + '" target="_blank" rel="noopener">Open on this device</a>' +
+      '<p class="note" style="margin-top:12px">The link holds your token. Send it only to yourself.</p>' +
+      '<script>function copy(){var t=document.getElementById("link");t.select();try{navigator.clipboard.writeText(t.value)}catch(e){document.execCommand("copy")}document.querySelector("button").textContent="Copied"}</script>';
+  }
+  var output = HtmlService.createHtmlOutput(style + body).setWidth(560).setHeight(missing.length ? 240 : 320);
+  SpreadsheetApp.getUi().showModalDialog(output, 'Connect phone');
 }
 
 // ---------------------------------------------------------------------------

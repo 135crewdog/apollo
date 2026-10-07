@@ -58,3 +58,19 @@ The app is static files served from GitHub Pages. One hosted copy serves everyon
 4. **Log**: choose Flight, Sim or Ground, set the mission number and Zulu date, tap **+** on each event as many times as it was done, then **Save**. Rows go into the sheet when there is a connection and wait in the app until then. Swipe or tap the segmented control to move between Log and Status; Status shows how many rows are waiting.
 
 When you change anything under `app/`, bump `VERSION` in `app/sw.js` and `APP_VERSION` in `app/app.js`, or phones keep the old copy.
+
+### Connect a phone without typing
+
+In the workbook choose **Apollo → Connect phone**. The dialog shows a link that opens Apollo with this workbook's web app URL and token already filled in. Send it to your phone, open it, and add Apollo to the home screen from there. The link contains your token, so send it only to yourself. If the dialog says something is missing, it names the step: the token property or the web app deployment.
+
+## Share Apollo with another aircrew member
+
+Give them the template's copy link: `TEMPLATE_COPY_URL`. Google asks them to make their own copy of "Apollo Template", which brings the four tabs, the RTM config and the script with it, but not your token or your log. Then they:
+
+1. Open **Extensions → Apps Script** in their copy, add a Script Property `APOLLO_TOKEN` with a secret of lowercase letters and digits, and run `refresh` once to grant permissions.
+2. **Deploy → New deployment → Web app**, Execute as **Me**, Who has access **Anyone**, Deploy.
+3. Back in the sheet, **Apollo → Connect phone**, and open the link on their phone.
+
+Their data stays in their own workbook. If their RTM column differs, they edit the two config tabs in their copy.
+
+When the script changes, paste the new files into the template's Apps Script project as well, or new copies start with old code.

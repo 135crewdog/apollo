@@ -16,7 +16,7 @@ Ask the user before adding anything that is not in this file. Ideas that were di
 |---|---|---|
 | 1 | `apps-script/rules.js`, `apps-script/Code.js`, `tests/`, `README.md`. Installed in the user's workbook and checked against test rows. | Done |
 | 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Done. Live at `https://135crewdog.github.io/apollo/` since the first Pages deploy on 2026-10-07 |
-| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | Next |
+| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | Handoff link built (Apollo → Connect phone, app reads the fragment). Template workbook: see "Sharing" below |
 
 ## The workbook
 
@@ -229,6 +229,14 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`) and `apollo.queue` (`[{ batchId, rows }]`).
 
 **Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline; API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or phones keep the old copy.
+
+## Sharing (milestone 3)
+
+**The handoff link.** Apollo → Connect phone in the sheet shows `https://135crewdog.github.io/apollo/#url=<web app URL>&token=<token>`, with Copy and Open buttons. The URL comes from `ScriptApp.getService().getUrl()` (a `/dev` ending is swapped for `/exec`) and the token from Script Properties; if either is missing the dialog says which step is left instead. The app reads the fragment on load and on `hashchange`, saves the connection, strips the fragment from the address bar with `history.replaceState`, closes Settings, shows "Connected to the workbook" and syncs. The connection travels in the fragment on purpose: browsers never send a fragment to the server, so GitHub Pages never sees the token. The link still contains the token, so it is for the owner's own phone only.
+
+**The template workbook.** A copy of the user's workbook named "Apollo Template", shared as "Anyone with the link: Viewer", offered through its `/copy` URL (`https://docs.google.com/spreadsheets/d/<id>/copy`), which prompts the recipient to make their own copy. A copy carries the four tabs, their headers and formats, the UTC time zone, the RTM config, and the bound script with both files, but not Script Properties, deployments or log rows, so the token never travels. The template's Training Log and summary hold only headers. A new user: copies, sets `APOLLO_TOKEN`, runs refresh once to authorise, deploys the web app (Execute as Me, Anyone), then Apollo → Connect phone and opens the link on their phone. Four steps and one authorisation screen, down from seven.
+
+**Keeping the template current.** The template's bound script is a separate copy of the code. Whenever `rules.js` or `Code.js` changes, paste into the template's Apps Script project as well as the live workbook, or new users start on old code. The template's config tabs are the MP / FTL A column; a user on another column edits their copy's config tabs.
 
 ## Gotchas
 

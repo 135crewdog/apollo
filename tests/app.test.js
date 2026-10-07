@@ -124,6 +124,19 @@ test('newBatchId is unique', () => {
   assert.equal(ids.size, 100);
 });
 
+test('parseHandoff: reads url and token from the fragment, rejects anything else', () => {
+  const url = 'https://script.google.com/macros/s/AKfy/exec';
+  const hash = '#url=' + encodeURIComponent(url) + '&token=' + encodeURIComponent('abc123');
+  assert.deepEqual(app.parseHandoff(hash), { url, token: 'abc123' });
+  assert.deepEqual(app.parseHandoff(hash.slice(1)), { url, token: 'abc123' });
+  assert.equal(app.parseHandoff(''), null);
+  assert.equal(app.parseHandoff('#'), null);
+  assert.equal(app.parseHandoff('#url=' + encodeURIComponent(url)), null);
+  assert.equal(app.parseHandoff('#token=abc'), null);
+  assert.equal(app.parseHandoff('#url=notaurl&token=abc'), null);
+  assert.equal(app.parseHandoff('#url=%E0%A4%A&token=abc'), null);
+});
+
 test('volumeText', () => {
   assert.equal(app.volumeText({ 'Volume Accomplished': '' }), '');
   assert.equal(app.volumeText({ 'Volume Accomplished': 3, 'Volume Required': '' }), '3 this FY');

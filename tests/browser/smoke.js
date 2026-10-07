@@ -150,6 +150,19 @@ async function main() {
     assert.equal(await page.inputValue('#url'), apiUrl, 'settings persisted');
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'theme persisted');
 
+    // The handoff link: a fresh phone opens the app URL with the connection in the fragment.
+    const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const p2 = await fresh.newPage();
+    p2.on('pageerror', (e) => errors.push(e.message));
+    await p2.goto(appUrl + '#url=' + encodeURIComponent(apiUrl) + '&token=' + encodeURIComponent('abc123'));
+    await p2.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
+    assert.equal(await p2.isVisible('#view-main'), true, 'handoff opens on the main view');
+    assert.equal(await p2.evaluate(() => window.location.hash), '', 'fragment stripped after handoff');
+    assert.equal(await p2.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).token), 'abc123', 'token saved from the handoff');
+    await p2.click('#settings-btn');
+    assert.equal(await p2.inputValue('#url'), apiUrl, 'url saved from the handoff');
+    await fresh.close();
+
     assert.deepEqual(errors, [], 'no page errors');
     console.log('browser smoke test passed');
   } finally {
