@@ -54,24 +54,33 @@ async function main() {
   // The offline step makes the browser log its own failed fetch; that is expected.
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   const shots = process.argv[2];
-  const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, name + '.png') }); };
+  // Panels slide for 300 ms, so let a screenshot wait for the transition to finish.
+  const shot = async (name) => { if (shots) { await page.waitForTimeout(400); await page.screenshot({ path: path.join(shots, name + '.png') }); } };
 
   try {
     await page.goto(appUrl);
     // With no settings the app opens on Settings.
     assert.equal(await page.isVisible('#screen-settings'), true, 'opens on Settings when unconfigured');
+    assert.equal(await page.isVisible('#view-main'), false, 'main view hidden behind Settings');
     await page.fill('#url', apiUrl);
     await page.fill('#token', 'wrong');
     await page.click('#save-settings');
-    await page.waitForFunction(() => document.getElementById('sync-status').textContent.includes('Bad token'));
+    await page.waitForFunction(() => document.getElementById('settings-error').textContent.includes('Bad token'));
     await page.fill('#token', 'abc123');
     await page.click('#save-settings');
     await page.waitForFunction(() => document.getElementById('sync-status').textContent.startsWith('Last sync'));
     await shot('settings');
+    // Theme setting applies to the document and persists.
+    await page.selectOption('#theme', 'dark');
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+    await shot('settings-dark');
+    await page.selectOption('#theme', 'light');
+    await page.click('#done');
+    assert.equal(await page.isVisible('#view-main'), true, 'Done returns to the main view');
 
     // Status: overdue first. Never-logged AL01YM and RT05YM (blank due date) sort ahead of
     // GD27YM (Annual from 2025-05-01, due 2026-09-30, overdue); AN01YM has no due date and is last.
-    await page.click('.tabs button[data-tab="status"]');
+    await page.click('.seg-tabs button[data-tab="status"]');
     const order = await page.locator('#summary .item .id').allTextContents();
     assert.deepEqual(order, ['AL01YM', 'RT05YM', 'GD27YM', 'AN01YM'], 'status order');
     const dues = await page.locator('#summary .item .due').allTextContents();
@@ -79,8 +88,8 @@ async function main() {
     await shot('status-before');
 
     // Log a flight with two landings; the 0% NVG event is offered in Flight.
-    await page.click('.tabs button[data-tab="log"]');
-    await page.click('.seg-btn[data-mode="flight"]');
+    await page.click('.seg-tabs button[data-tab="log"]');
+    await page.click('.toggle-group button[data-mode="flight"]');
     assert.equal(await page.inputValue('#date'), TODAY, 'date defaults to the Zulu date');
     assert.equal(await page.locator('#events .event').count(), 3, 'all flying events in Flight');
     assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL', 'AN', 'RT'], 'group headings by Task ID prefix');
@@ -96,12 +105,12 @@ async function main() {
     await page.waitForFunction(() => document.getElementById('toast').textContent.includes('mission number'));
     await page.fill('#mission', '0123');
     await page.click('#save');
-    await page.waitForFunction(() => document.getElementById('topline').textContent.startsWith('As of'));
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
     assert.equal(api.state.log.filter((r) => r.id === 'AL01YM' && r.mission === '0123').length, 2, 'two landing rows reached the API');
 
     // Sim hides the 0% event.
     await page.fill('#search', '');
-    await page.click('.seg-btn[data-mode="sim"]');
+    await page.click('.toggle-group button[data-mode="sim"]');
     assert.equal(await page.locator('#events .event').count(), 2, '0% event hidden in Sim');
     assert.equal(await page.isVisible('#mission-field'), false, 'no mission field in Sim');
 
@@ -109,16 +118,16 @@ async function main() {
     await context.setOffline(true);
     await page.click('#events button[data-id="RT05YM"][data-delta="1"]');
     await page.click('#save');
-    await page.waitForFunction(() => document.getElementById('topline').textContent.includes('1 row waiting to sync'));
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('1 row waiting to sync'));
     const postsBefore = api.state.posts;
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    await page.waitForFunction(() => document.getElementById('topline').textContent.startsWith('As of'));
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
     assert.equal(api.state.log.filter((r) => r.id === 'RT05YM' && r.mission === 'SIM').length, 1, 'sim row synced after reconnect');
     assert.equal(api.state.posts, postsBefore + 1, 'exactly one POST after reconnect');
 
     // Status reflects the new volume: 2 of 12 landings.
-    await page.click('.tabs button[data-tab="status"]');
+    await page.click('.seg-tabs button[data-tab="status"]');
     const landing = await page.locator('#summary .item', { hasText: 'AL01YM' }).textContent();
     assert.ok(landing.includes('2 of 12 this FY'), 'volume shown from the summary: ' + landing);
     await shot('status-after');
@@ -128,7 +137,10 @@ async function main() {
     await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller !== null || (navigator.serviceWorker.getRegistrations && true));
     const reg = await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => !!r));
     assert.equal(reg, true, 'service worker registered');
+    assert.equal(await page.isVisible('#view-main'), true, 'configured app opens on the main view');
+    await page.click('#settings-btn');
     assert.equal(await page.inputValue('#url'), apiUrl, 'settings persisted');
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'theme persisted');
 
     assert.deepEqual(errors, [], 'no page errors');
     console.log('browser smoke test passed');
