@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.7';
+var APP_VERSION = '2026.10.07.8';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------

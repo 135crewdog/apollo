@@ -1,0 +1,44 @@
+/* The guide shares Apollo's tokens; it is a reading page, so the column is wider than the app's. */
+:root {
+  --bg: #f2f2f7; --elev: #ffffff; --border: #c6c6c8; --text: #000000; --text2: #8e8e93; --fill: #e5e5ea;
+  --red: #ea9999; --orange: #f9cb9c; --yellow: #fff2cc; --grey: #666666; --on-accent: #1c1c1e;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000000; --elev: #1c1c1e; --border: #38383a; --text: #ffffff; --text2: #98989d; --fill: #48484a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--text); }
+.page { max-width: 720px; margin: 0 auto; padding: 16px 20px 48px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; margin: 0; }
+.sub { margin: 0; color: var(--text2); font-size: 15px; }
+h2 { font-size: 22px; font-weight: 700; margin: 36px 0 10px; letter-spacing: -0.3px; }
+h3 { font-size: 17px; font-weight: 600; margin: 18px 0 6px; }
+p, li { margin: 0 0 10px; }
+ul { padding-left: 22px; }
+a { color: inherit; }
+code { font: 14px/1.4 "SF Mono", Menlo, Consolas, monospace; background: var(--fill); padding: 1px 6px; border-radius: 6px; }
+.note { color: var(--text2); font-size: 15px; }
+.card { background: var(--elev); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.toc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 15px; }
+.toc a { text-decoration: none; padding: 4px 0; }
+.btn { display: inline-block; font: 600 17px -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif; padding: 12px 18px; border-radius: 12px; border: none; text-decoration: none; cursor: pointer; background: var(--fill); color: var(--text); }
+.btn.primary { background: var(--red); color: var(--on-accent); }
+.btn.small { font-size: 14px; padding: 8px 14px; border-radius: 10px; }
+ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 16px 0; }
+ol.steps > li { counter-increment: step; position: relative; padding: 16px 16px 8px 56px; background: var(--elev); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+ol.steps > li::before { content: counter(step); position: absolute; left: 16px; top: 16px; width: 28px; height: 28px; border-radius: 14px; background: var(--orange); color: var(--on-accent); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+ol.steps h3 { margin-top: 2px; }
+figure { margin: 12px 0 8px; }
+figure img { display: block; max-width: 100%; width: 300px; border: 1px solid var(--border); border-radius: 12px; }
+figcaption { font-size: 14px; color: var(--text2); margin-top: 6px; }
+figure.capture { border: 1px dashed var(--border); border-radius: 10px; padding: 14px; color: var(--text2); font-size: 14px; font-style: italic; }
+dl.trouble dt { font-weight: 600; margin-top: 14px; }
+dl.trouble dd { margin: 4px 0 0; color: var(--text2); }
+.codeblock { background: var(--elev); border: 1px solid var(--border); border-radius: 10px; margin: 14px 0; overflow: hidden; }
+.codehead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.codeblock pre { margin: 0; padding: 12px; max-height: 320px; overflow: auto; font: 12px/1.45 "SF Mono", Menlo, Consolas, monospace; }
+.codeblock pre code { background: none; padding: 0; font: inherit; white-space: pre; }
+code.loading { color: var(--text2); font-style: italic; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text2); font-size: 14px; }
