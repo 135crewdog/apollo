@@ -1,7 +1,7 @@
 /* Apollo service worker: caches the app shell so the app opens offline.
  * Bump VERSION on every change to any file in app/, or devices keep the old copy.
  * API calls go to another origin and are never intercepted. */
-var VERSION = 'apollo-2026.10.07.12';
+var VERSION = 'apollo-2026.10.07.13';
 var SHELL = ['./', './index.html', './app.js', './style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (event) {
@@ -21,25 +21,19 @@ self.addEventListener('fetch', function (event) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  // One rule for every file, pages and assets alike: network first, revalidated past the
+  // browser's HTTP cache, so a new page and its new script always arrive together. The
+  // cached copy serves when offline, and the app shell is the last resort for a page.
   event.respondWith(
     caches.open(VERSION).then(function (cache) {
-      if (req.mode === 'navigate') {
-        // Pages (the app, the guide): network first so a new version shows at once; the
-        // cached copy of the same page when offline; the app shell as a last resort.
-        return fetch(req).then(function (res) {
-          if (res && res.ok) cache.put(req, res.clone());
-          return res;
-        }).catch(function () {
-          return cache.match(req, { ignoreSearch: true }).then(function (cached) { return cached || cache.match('./'); });
+      return fetch(req, { cache: 'no-cache' }).then(function (res) {
+        if (res && res.ok) cache.put(req, res.clone());
+        return res;
+      }).catch(function () {
+        return cache.match(req, { ignoreSearch: true }).then(function (cached) {
+          if (cached || req.mode !== 'navigate') return cached;
+          return cache.match('./');
         });
-      }
-      // Scripts, styles, icons: cached copy at once, refreshed in the background.
-      return cache.match(req, { ignoreSearch: true }).then(function (cached) {
-        var network = fetch(req).then(function (res) {
-          if (res && res.ok) cache.put(req, res.clone());
-          return res;
-        }).catch(function () { return cached; });
-        return cached || network;
       });
     })
   );
