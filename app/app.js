@@ -10,14 +10,14 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.9';
+var APP_VERSION = '2026.10.07.10';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-/** Today's Zulu date. Never the phone's local date. */
+/** Today's Zulu date. Never the device's local date. */
 function todayUtc() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -47,7 +47,7 @@ function daysBetween(a, b) {
   return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
 }
 
-/** Colour band for a summary row, the same bands as the sheet's Due Date column. */
+/** Color band for a summary row, the same bands as the sheet's Due Date column. */
 function dueBand(row, today) {
   if (row['Overdue'] === 'YES') return 'overdue';
   var due = row['Due Date'];
@@ -137,9 +137,9 @@ function buildRows(mode, mission, date, counts, events) {
 }
 
 /**
- * The handoff link from the sheet's Apollo → Connect phone dialog puts the web app
+ * The handoff link from the sheet's Apollo → Connect device dialog puts the web app
  * URL and token in the fragment: '#url=…&token=…'. Returns { url, token } or null.
- * The fragment never leaves the phone: browsers do not send it to the server.
+ * The fragment never leaves the device: browsers do not send it to the server.
  */
 function parseHandoff(hash) {
   var h = String(hash || '').replace(/^#/, '');
@@ -470,7 +470,7 @@ if (typeof document !== 'undefined') {
         .then(function () { ui.lastError = ''; })
         .catch(function (err) {
           var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-          if (offline || err instanceof TypeError) ui.lastError = 'No connection. Rows are saved on this phone and will sync later.';
+          if (offline || err instanceof TypeError) ui.lastError = 'No connection. Rows are saved on this device and will sync later.';
           else ui.lastError = (err && err.message) || 'Sync failed';
         })
         .then(function () {
@@ -575,8 +575,8 @@ if (typeof document !== 'undefined') {
     $('clear-data').addEventListener('click', function () {
       var pending = pendingRows(queue);
       var msg = pending
-        ? 'This deletes ' + pending + ' unsynced ' + (pending === 1 ? 'row' : 'rows') + ', the saved summary, and the URL and token on this phone. The workbook is untouched. Continue?'
-        : 'This deletes the saved summary and the URL and token on this phone. The workbook is untouched. Continue?';
+        ? 'This deletes ' + pending + ' unsynced ' + (pending === 1 ? 'row' : 'rows') + ', the saved summary, and the URL and token on this device. The workbook is untouched. Continue?'
+        : 'This deletes the saved summary and the URL and token on this device. The workbook is untouched. Continue?';
       if (!window.confirm(msg)) return;
       Object.keys(STORAGE).forEach(function (k) { try { localStorage.removeItem(STORAGE[k]); } catch (err) { /* ignore */ } });
       settings = { url: '', token: '', theme: settings.theme };

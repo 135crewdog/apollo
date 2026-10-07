@@ -1,7 +1,7 @@
 /* The guide shares Apollo's tokens; it is a reading page, so the column is wider than the app's. */
 :root {
   --bg: #f2f2f7; --elev: #ffffff; --border: #c6c6c8; --text: #000000; --text2: #8e8e93; --fill: #e5e5ea;
-  --red: #ea9999; --orange: #f9cb9c; --yellow: #fff2cc; --grey: #666666; --on-accent: #1c1c1e;
+  --red: #ea9999; --orange: #f9cb9c; --yellow: #fff2cc; --gray: #666666; --on-accent: #1c1c1e;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {

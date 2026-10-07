@@ -3,7 +3,7 @@
  *
  * Reads the Training Log and the two config tabs, asks rules.js for the
  * summary, and writes the Individual Training Summary tab. Also serves the
- * web app API (doGet / doPost) used by the phone app.
+ * web app API (doGet / doPost) used by the app.
  *
  * All date and volume math lives in rules.js. This file only moves data
  * between the sheet, the rules and the API.
@@ -173,11 +173,11 @@ function fillSummary(sheet, values) {
   }
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
   sheet.setFrozenRows(1);
-  colourDueDates(sheet, values.length - 1);
+  colorDueDates(sheet, values.length - 1);
 }
 
 /**
- * Due Date colours, display only: no rule lives here. Sheets evaluates these
+ * Due Date colors, display only: no rule lives here. Sheets evaluates these
  * with TODAY() in the workbook's time zone, which is UTC. First match wins.
  */
 var DUE_SOON_BANDS = [
@@ -188,7 +188,7 @@ var DUE_SOON_BANDS = [
 var OVERDUE_BACKGROUND = '#666666';
 var OVERDUE_FONT = '#FFFFFF';
 
-function colourDueDates(sheet, rowCount) {
+function colorDueDates(sheet, rowCount) {
   if (rowCount < 1) {
     sheet.setConditionalFormatRules([]);
     return;

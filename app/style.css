@@ -1,4 +1,4 @@
-/* Apollo: the same visual system as Show Time (iOS-style), with the due-date colours as the accent. */
+/* Apollo: the same visual system as Show Time (iOS-style), with the due-date colors as the accent. */
 
 :root {
   --bg: #f2f2f7;
@@ -19,7 +19,7 @@
   --red: #ea9999;
   --orange: #f9cb9c;
   --yellow: #fff2cc;
-  --grey: #666666;
+  --gray: #666666;
   --on-accent: #1c1c1e;
   --band-text: #1c1c1e;
   --shadow: rgba(0, 0, 0, 0.1);
@@ -50,8 +50,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* As in Show Time: the page behind the 430px column is the elevated colour, so on a wide
-     screen the app reads as a phone-shaped panel. On a phone the column fills the screen. */
+  /* As in Show Time: the page behind the 430px column is the elevated color, so on a wide
+     screen the app reads as a narrow panel. On a small screen the column fills it. */
   background: var(--elev);
   color: var(--text);
   overflow: hidden;
@@ -217,7 +217,7 @@ label.check input { width: 20px; height: 20px; accent-color: var(--red); }
   white-space: nowrap; font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 8px;
   font-size: 13px; font-weight: 600; background: var(--fill); color: var(--text2);
 }
-.due.band-overdue { background: var(--grey); color: #ffffff; }
+.due.band-overdue { background: var(--gray); color: #ffffff; }
 .due.band-d30 { background: var(--red); color: var(--band-text); }
 .due.band-d60 { background: var(--orange); color: var(--band-text); }
 .due.band-d90 { background: var(--yellow); color: var(--band-text); }
