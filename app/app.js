@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.1';
+var APP_VERSION = '2026.10.07.2';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -86,6 +86,24 @@ function filterEvents(events, query) {
   return events.filter(function (e) {
     return String(e.id || '').toLowerCase().indexOf(q) !== -1 || String(e.name || '').toLowerCase().indexOf(q) !== -1;
   });
+}
+
+/**
+ * Group events by RTM category, the first two characters of the Task ID.
+ * Groups keep the order of their first appearance in the config; events keep
+ * config order within a group. Returns [{ key, events }].
+ */
+function groupEvents(events) {
+  var groups = [], byKey = {};
+  for (var i = 0; i < events.length; i++) {
+    var key = String(events[i].id || '').trim().toUpperCase().slice(0, 2);
+    if (!byKey[key]) {
+      byKey[key] = { key: key, events: [] };
+      groups.push(byKey[key]);
+    }
+    byKey[key].events.push(events[i]);
+  }
+  return groups;
 }
 
 /**
@@ -207,7 +225,18 @@ if (typeof document !== 'undefined') {
       if (!eventsForMode(ui.mode, data).length) {
         list.appendChild(el('li', 'empty', data.asOf ? 'No events in this config tab.' : 'No config yet. Set the web app URL and token in Settings, then Sync now.'));
       }
-      events.forEach(function (e) {
+      groupEvents(events).forEach(function (g) {
+        list.appendChild(el('li', 'group', g.key));
+        g.events.forEach(function (e) { list.appendChild(eventItem(e)); });
+      });
+
+      var total = 0;
+      Object.keys(ui.counts).forEach(function (id) { total += ui.counts[id]; });
+      $('save').disabled = total === 0;
+      $('save').textContent = total ? 'Save ' + total + (total === 1 ? ' row' : ' rows') : 'Save';
+    }
+
+    function eventItem(e) {
         var n = ui.counts[e.id] || 0;
         var li = el('li', 'event' + (n ? ' picked' : ''));
         var name = el('div', 'name');
@@ -231,13 +260,7 @@ if (typeof document !== 'undefined') {
         counter.appendChild(count);
         counter.appendChild(plus);
         li.appendChild(counter);
-        list.appendChild(li);
-      });
-
-      var total = 0;
-      Object.keys(ui.counts).forEach(function (id) { total += ui.counts[id]; });
-      $('save').disabled = total === 0;
-      $('save').textContent = total ? 'Save ' + total + (total === 1 ? ' row' : ' rows') : 'Save';
+        return li;
     }
 
     function renderStatus() {
@@ -492,6 +515,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sortSummary: sortSummary,
     eventsForMode: eventsForMode,
     filterEvents: filterEvents,
+    groupEvents: groupEvents,
     buildRows: buildRows,
     pendingRows: pendingRows,
     newBatchId: newBatchId,

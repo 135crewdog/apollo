@@ -83,8 +83,10 @@ async function main() {
     await page.click('.seg-btn[data-mode="flight"]');
     assert.equal(await page.inputValue('#date'), TODAY, 'date defaults to the Zulu date');
     assert.equal(await page.locator('#events .event').count(), 3, 'all flying events in Flight');
+    assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL', 'AN', 'RT'], 'group headings by Task ID prefix');
     await page.fill('#search', 'land');
     assert.equal(await page.locator('#events .event').count(), 1);
+    assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL'], 'only groups with matches keep a heading');
     await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
     await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
     assert.equal(await page.textContent('#save'), 'Save 2 rows');

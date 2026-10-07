@@ -76,6 +76,17 @@ test('filterEvents matches id or name, case-insensitive, trimmed', () => {
   assert.deepEqual(app.filterEvents(events, 'zzz'), []);
 });
 
+test('groupEvents: by first two characters of the Task ID, groups in first-appearance order, config order inside', () => {
+  const events = [
+    { id: 'AH11YM' }, { id: 'AL01YM' }, { id: 'AP07YM' }, { id: 'AL15YM' }, { id: 'MB10YM' }, { id: 'AP53YM' }, { id: 'FLTMED' }, { id: ' al99ym ' },
+  ];
+  const groups = app.groupEvents(events);
+  assert.deepEqual(groups.map((g) => g.key), ['AH', 'AL', 'AP', 'MB', 'FL']);
+  assert.deepEqual(groups[1].events.map((e) => e.id), ['AL01YM', 'AL15YM', ' al99ym ']);
+  assert.deepEqual(groups[2].events.map((e) => e.id), ['AP07YM', 'AP53YM']);
+  assert.deepEqual(app.groupEvents([]), []);
+});
+
 test('buildRows: one row per tap in event order, mission by mode, validation errors', () => {
   const events = [{ id: 'F1' }, { id: 'F2' }, { id: 'F3' }];
   const built = app.buildRows('flight', ' 0123 ', '2026-10-07', { F3: 1, F1: 2 }, events);
