@@ -21,6 +21,16 @@ test('isIsoDate accepts real dates only', () => {
   assert.equal(app.isIsoDate('CHECK LABEL'), false);
 });
 
+test('formatDisplayDate: DD-Mmm-YY for humans, other values untouched', () => {
+  assert.equal(app.formatDisplayDate('2026-10-07'), '07-Oct-26');
+  assert.equal(app.formatDisplayDate('2027-01-31'), '31-Jan-27');
+  assert.equal(app.formatDisplayDate('2019-08-15'), '15-Aug-19');
+  assert.equal(app.formatDisplayDate(''), '');
+  assert.equal(app.formatDisplayDate(null), '');
+  assert.equal(app.formatDisplayDate('CHECK LABEL'), 'CHECK LABEL');
+  assert.equal(app.formatDisplayDate('yesterday'), 'yesterday');
+});
+
 test('dueBand matches the sheet bands', () => {
   const row = (due, overdue) => ({ 'Due Date': due, 'Overdue': overdue || '' });
   assert.equal(app.dueBand(row('', 'YES'), TODAY), 'overdue');

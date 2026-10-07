@@ -83,14 +83,22 @@ async function main() {
     await page.click('.seg-tabs button[data-tab="status"]');
     const order = await page.locator('#summary .item .id').allTextContents();
     assert.deepEqual(order, ['AL01YM', 'RT05YM', 'GD27YM', 'AN01YM'], 'status order');
+    assert.match(await page.textContent('#status-head'), /^As of \d{2}-[A-Z][a-z]{2}-\d{2} /, 'As of in DD-Mmm-YY');
+    const names = await page.locator('#summary .item .name').allTextContents();
+    assert.deepEqual(names, ['Landing', 'Tanker AAR Autopilot Off', 'CRM/TEM Refresher', 'NVG Sortie'], 'task name leads');
     const dues = await page.locator('#summary .item .due').allTextContents();
-    assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', 'OVERDUE 2026-09-30', 'No due date'], 'due badges');
+    assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', 'OVERDUE 30-Sep-26', 'No due date'], 'due badges in DD-Mmm-YY');
     await shot('status-before');
 
     // Log a flight with two landings; the 0% NVG event is offered in Flight.
     await page.click('.seg-tabs button[data-tab="log"]');
     await page.click('.toggle-group button[data-mode="flight"]');
     assert.equal(await page.inputValue('#date'), TODAY, 'date defaults to the Zulu date');
+    const shown = await page.textContent('#date-display');
+    assert.match(shown, /^\d{2}-[A-Z][a-z]{2}-\d{2}$/, 'date shown as DD-Mmm-YY: ' + shown);
+    await page.fill('#date', '2026-10-03');
+    assert.equal(await page.textContent('#date-display'), '03-Oct-26', 'display follows the picker');
+    await page.fill('#date', TODAY);
     assert.equal(await page.locator('#events .event').count(), 3, 'all flying events in Flight');
     assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL', 'AN', 'RT'], 'group headings by Task ID prefix');
     await page.fill('#search', 'land');
