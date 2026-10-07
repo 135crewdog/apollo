@@ -141,6 +141,17 @@
 
 </div>
 <div id="toast" class="toast hidden" role="status"></div>
+<script>
+// If an older service worker handed this app shell to a different page's address (the
+// guide, for example), let the updated worker take over and load the right page.
+(function () {
+  var here = location.pathname;
+  var isAppRoot = /\/(index\.html)?$/.test(here) && !/\/guide\/(index\.html)?$/.test(here);
+  if (isAppRoot || !('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('controllerchange', function () { location.reload(); });
+  navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); });
+})();
+</script>
 <script src="app.js"></script>
 </body>
 </html>
