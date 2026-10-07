@@ -86,6 +86,14 @@ test('filterEvents matches id or name, case-insensitive, trimmed', () => {
   assert.deepEqual(app.filterEvents(events, 'zzz'), []);
 });
 
+test('filterSummary matches Task ID or Task Name on summary rows, case-insensitive, trimmed', () => {
+  const summary = [{ 'Task ID': 'AL01YM', 'Task Name': 'Landing' }, { 'Task ID': 'GD27YM', 'Task Name': 'CRM/TEM Refresher' }];
+  assert.equal(app.filterSummary(summary, '').length, 2);
+  assert.deepEqual(app.filterSummary(summary, ' crm ').map((r) => r['Task ID']), ['GD27YM']);
+  assert.deepEqual(app.filterSummary(summary, 'al01').map((r) => r['Task ID']), ['AL01YM']);
+  assert.deepEqual(app.filterSummary(summary, 'zzz'), []);
+});
+
 test('groupEvents: by first two characters of the Task ID, groups in first-appearance order, config order inside', () => {
   const events = [
     { id: 'AH11YM' }, { id: 'AL01YM' }, { id: 'AP07YM' }, { id: 'AL15YM' }, { id: 'MB10YM' }, { id: 'AP53YM' }, { id: 'FLTMED' }, { id: ' al99ym ' },
