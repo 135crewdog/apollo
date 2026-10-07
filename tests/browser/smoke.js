@@ -159,6 +159,17 @@ async function main() {
     await page.click('#settings-btn');
     assert.equal(await page.inputValue('#url'), apiUrl, 'settings persisted');
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'theme persisted');
+    await page.click('#done');
+
+    // Offline, the whole shell (page, script, styles) comes from the service worker's cache.
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+    await context.setOffline(true);
+    await page.reload();
+    await page.waitForSelector('#summary .item');
+    const appVersion = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'app.js'), 'utf8').match(/APP_VERSION = '([^']+)'/)[1];
+    assert.equal(await page.textContent('#version'), appVersion, 'script loaded from cache offline');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app')).maxWidth), '430px', 'styles loaded from cache offline');
+    await context.setOffline(false);
 
     // The handoff link: a fresh device opens the app URL with the connection in the fragment.
     const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });

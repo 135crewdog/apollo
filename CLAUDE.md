@@ -229,7 +229,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`) and `apollo.queue` (`[{ batchId, rows }]`).
 
-**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline: pages are network-first with the cached page as the offline fallback, assets are served from cache and refreshed in the background; API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
+**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline. Every file, page or asset, is network-first and revalidated past the browser's HTTP cache, with the cached copy as the offline fallback, so a new page and its new script always arrive together (serving assets cache-first once showed a new page with the old script, and a new field did nothing until the next launch); API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
 
 ## Sharing (milestone 3)
 
