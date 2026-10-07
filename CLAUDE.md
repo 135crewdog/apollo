@@ -15,8 +15,8 @@ Ask the user before adding anything that is not in this file. Ideas that were di
 | # | Scope | Status |
 |---|---|---|
 | 1 | `apps-script/rules.js`, `apps-script/Code.js`, `tests/`, `README.md`. Installed in the user's workbook and checked against test rows. | Done |
-| 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Built and tested in a browser; goes live when GitHub Pages is enabled on the repo (Settings → Pages → Source: GitHub Actions) and merged to main |
-| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | After 2 |
+| 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Done. Live at `https://135crewdog.github.io/apollo/` since the first Pages deploy on 2026-10-07 |
+| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | Next |
 
 ## The workbook
 

@@ -1,6 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#11161f"/>
-  <circle cx="256" cy="256" r="150" fill="none" stroke="#e8edf3" stroke-width="28"/>
-  <circle cx="256" cy="256" r="52" fill="#4f8fe0"/>
-  <path d="M256 70 L256 118 M256 394 L256 442 M70 256 L118 256 M394 256 L442 256" stroke="#e8edf3" stroke-width="28" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EA9999"/>
+      <stop offset="0.5" stop-color="#F9CB9C"/>
+      <stop offset="1" stop-color="#FFF2CC"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <text x="256" y="256" text-anchor="middle" dominant-baseline="central"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="112" font-weight="700" letter-spacing="2" fill="#16202C">Apollo</text>
 </svg>
