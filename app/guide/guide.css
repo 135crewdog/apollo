@@ -34,6 +34,14 @@ figure { margin: 12px 0 8px; }
 figure img { display: block; max-width: 100%; width: 300px; border: 1px solid var(--border); border-radius: 12px; }
 figcaption { font-size: 14px; color: var(--text2); margin-top: 6px; }
 figure.capture { border: 1px dashed var(--border); border-radius: 10px; padding: 14px; color: var(--text2); font-size: 14px; font-style: italic; }
+details { margin: 6px 0 10px; }
+details summary { cursor: pointer; color: var(--text2); font-size: 15px; font-weight: 600; list-style: none; display: inline-block; padding: 4px 0; }
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: "…"; }
+details[open] summary::after { content: ""; }
+details[open] summary { color: var(--text); }
+details > p { font-size: 15px; color: var(--text2); margin: 6px 0 8px; }
+details > p b, details > p code { color: var(--text); }
 dl.trouble dt { font-weight: 600; margin-top: 14px; }
 dl.trouble dd { margin: 4px 0 0; color: var(--text2); }
 .codeblock { background: var(--elev); border: 1px solid var(--border); border-radius: 10px; margin: 14px 0; overflow: hidden; }
