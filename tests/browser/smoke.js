@@ -90,6 +90,16 @@ async function main() {
     assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', 'OVERDUE 30-Sep-26', 'No due date'], 'due badges in DD-Mmm-YY');
     await shot('status-before');
 
+    // Status search narrows by name or ID, and clears back to the full list.
+    await page.fill('#status-search', 'tanker');
+    assert.deepEqual(await page.locator('#summary .item .id').allTextContents(), ['RT05YM'], 'status search by name');
+    await page.fill('#status-search', 'gd27');
+    assert.deepEqual(await page.locator('#summary .item .id').allTextContents(), ['GD27YM'], 'status search by id');
+    await page.fill('#status-search', 'zzz');
+    assert.equal(await page.textContent('#summary .empty'), 'No events match.', 'status search empty state');
+    await page.fill('#status-search', '');
+    assert.equal(await page.locator('#summary .item').count(), 4, 'status search cleared');
+
     // Log a flight with two landings; the 0% NVG event is offered in Flight.
     await page.click('.seg-tabs button[data-tab="log"]');
     await page.click('.toggle-group button[data-mode="flight"]');

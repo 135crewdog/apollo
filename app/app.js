@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.11';
+var APP_VERSION = '2026.10.07.12';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -94,6 +94,15 @@ function filterEvents(events, query) {
   if (!q) return events;
   return events.filter(function (e) {
     return String(e.id || '').toLowerCase().indexOf(q) !== -1 || String(e.name || '').toLowerCase().indexOf(q) !== -1;
+  });
+}
+
+/** Status search: the same match as the Log search, on summary rows keyed by header. */
+function filterSummary(summary, query) {
+  var q = String(query || '').trim().toLowerCase();
+  if (!q) return summary;
+  return summary.filter(function (r) {
+    return String(r['Task ID'] || '').toLowerCase().indexOf(q) !== -1 || String(r['Task Name'] || '').toLowerCase().indexOf(q) !== -1;
   });
 }
 
@@ -211,7 +220,7 @@ if (typeof document !== 'undefined') {
     if (!settings.theme) settings.theme = 'auto';
     var data = load(STORAGE.data, { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' });
     var queue = load(STORAGE.queue, []);
-    var ui = { tab: 'log', mode: 'flight', query: '', counts: {}, syncing: false, lastError: '', settingsOpen: false };
+    var ui = { tab: 'log', mode: 'flight', query: '', statusQuery: '', counts: {}, syncing: false, lastError: '', settingsOpen: false };
     var toastTimer = null;
 
     // ---- theme ----
@@ -354,8 +363,13 @@ if (typeof document !== 'undefined') {
         list.appendChild(el('li', 'empty', 'No summary yet. Open Settings, enter the web app URL and token, then Sync now.'));
         return;
       }
+      var rows = filterSummary(sortSummary(data.summary), ui.statusQuery);
+      if (!rows.length) {
+        list.appendChild(el('li', 'empty', 'No events match.'));
+        return;
+      }
       var today = todayUtc();
-      sortSummary(data.summary).forEach(function (r) {
+      rows.forEach(function (r) {
         var band = dueBand(r, today);
         var li = el('li', 'item');
         var head = el('div', 'head');
@@ -524,6 +538,11 @@ if (typeof document !== 'undefined') {
       renderLog();
     });
 
+    $('status-search').addEventListener('input', function (e) {
+      ui.statusQuery = e.target.value;
+      renderStatus();
+    });
+
     $('events').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-id]');
       if (!b) return;
@@ -644,6 +663,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sortSummary: sortSummary,
     eventsForMode: eventsForMode,
     filterEvents: filterEvents,
+    filterSummary: filterSummary,
     groupEvents: groupEvents,
     buildRows: buildRows,
     pendingRows: pendingRows,
