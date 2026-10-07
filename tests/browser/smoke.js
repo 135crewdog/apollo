@@ -83,6 +83,7 @@ async function main() {
     await page.click('.seg-tabs button[data-tab="status"]');
     const order = await page.locator('#summary .item .id').allTextContents();
     assert.deepEqual(order, ['AL01YM', 'RT05YM', 'GD27YM', 'AN01YM'], 'status order');
+    assert.match(await page.textContent('#status-head'), /^As of \d{2}-[A-Z][a-z]{2}-\d{2} /, 'As of in DD-Mmm-YY');
     const names = await page.locator('#summary .item .name').allTextContents();
     assert.deepEqual(names, ['Landing', 'Tanker AAR Autopilot Off', 'CRM/TEM Refresher', 'NVG Sortie'], 'task name leads');
     const dues = await page.locator('#summary .item .due').allTextContents();

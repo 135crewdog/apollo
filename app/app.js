@@ -312,7 +312,7 @@ if (typeof document !== 'undefined') {
 
     function renderStatus() {
       var head = [];
-      if (data.asOf) head.push('As of ' + data.asOf);
+      if (data.asOf) head.push('As of ' + formatDisplayDate(data.asOf));
       head.push(pendingText());
       $('status-head').textContent = head.join(' · ');
 
