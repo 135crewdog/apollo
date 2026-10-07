@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.6';
+var APP_VERSION = '2026.10.07.7';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,26 @@ function buildRows(mode, mission, date, counts, events) {
   }
   if (!rows.length) return { error: 'Tap + on at least one event.' };
   return { rows: rows };
+}
+
+/**
+ * The handoff link from the sheet's Apollo → Connect phone dialog puts the web app
+ * URL and token in the fragment: '#url=…&token=…'. Returns { url, token } or null.
+ * The fragment never leaves the phone: browsers do not send it to the server.
+ */
+function parseHandoff(hash) {
+  var h = String(hash || '').replace(/^#/, '');
+  if (!h) return null;
+  var params = {};
+  h.split('&').forEach(function (kv) {
+    var i = kv.indexOf('=');
+    if (i === -1) return;
+    try { params[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1)); } catch (err) { /* skip a bad pair */ }
+  });
+  var url = String(params.url || '').trim();
+  var token = String(params.token || '').trim();
+  if (!/^https?:\/\//.test(url) || !token) return null;
+  return { url: url, token: token };
 }
 
 function pendingRows(queue) {
@@ -575,12 +595,35 @@ if (typeof document !== 'undefined') {
       if (document.visibilityState === 'visible' && pendingRows(queue)) sync();
     });
 
+    // ---- handoff link from the sheet ----
+
+    function takeHandoff() {
+      var h = parseHandoff(window.location.hash);
+      if (!h) return false;
+      settings.url = h.url;
+      settings.token = h.token;
+      save(STORAGE.settings, settings);
+      try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (err) { /* leave the fragment */ }
+      ui.settingsOpen = false;
+      ui.lastError = '';
+      return true;
+    }
+    window.addEventListener('hashchange', function () {
+      if (takeHandoff()) {
+        render();
+        toast('Connected to the workbook');
+        sync();
+      }
+    });
+
     // ---- start ----
 
     applyTheme();
     $('date').value = todayUtc();
+    var handedOff = takeHandoff();
     if (!settings.url || !settings.token) ui.settingsOpen = true;
     render();
+    if (handedOff) toast('Connected to the workbook');
     if (settings.url && settings.token) sync();
 
     if ('serviceWorker' in navigator) {
@@ -604,6 +647,7 @@ if (typeof module !== 'undefined' && module.exports) {
     groupEvents: groupEvents,
     buildRows: buildRows,
     pendingRows: pendingRows,
+    parseHandoff: parseHandoff,
     newBatchId: newBatchId,
     volumeText: volumeText
   };
