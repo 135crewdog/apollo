@@ -150,7 +150,7 @@ async function main() {
     assert.equal(await page.inputValue('#url'), apiUrl, 'settings persisted');
     assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'theme persisted');
 
-    // The handoff link: a fresh phone opens the app URL with the connection in the fragment.
+    // The handoff link: a fresh device opens the app URL with the connection in the fragment.
     const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const p2 = await fresh.newPage();
     p2.on('pageerror', (e) => errors.push(e.message));

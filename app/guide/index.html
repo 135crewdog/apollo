@@ -35,7 +35,7 @@
   <p>Apollo is a personal KC-135 aircrew training tracker. You tap what you did on a sortie, in the sim or in a ground class, and the rows land in a Google Sheet that you own. A small script inside that sheet works out currency, due dates and volume for every event in your column of the RTM and writes an Individual Training Summary. The app shows you that summary, overdue first.</p>
   <p>Three things to know before you start:</p>
   <ul>
-    <li><b>Your data stays in your Google Drive.</b> Nobody else, including the person who sent you this guide, can see your records. The app is a static web page with no server behind it; every phone talks only to its owner's sheet.</li>
+    <li><b>Your data stays in your Google Drive.</b> Nobody else, including the person who sent you this guide, can see your records. The app is a static web page with no server behind it; every device talks only to its owner's sheet.</li>
     <li><b>Every date is Zulu.</b> The app, the sheet and the summary all use the UTC date. A late-evening sortie may belong to tomorrow's Zulu date.</li>
     <li><b>It is an unofficial tool.</b> Your training office's records are the record of truth. Apollo helps you see what is coming; it does not replace Puckboard or your ITS.</li>
   </ul>
@@ -45,14 +45,14 @@
   <h2>What you need</h2>
   <ul>
     <li>A Google account with Drive.</li>
-    <li>A phone or tablet with Safari or Chrome. A desktop browser works too.</li>
+    <li>Any device with a modern browser: phone, tablet or computer. Safari and Chrome both work.</li>
     <li>About fifteen minutes, once. After setup, logging a sortie takes about as long as it does in Puckboard.</li>
   </ul>
 </section>
 
 <section id="setup">
   <h2>One-time setup</h2>
-  <p>Eight steps. Steps 2 to 7 happen inside Google Sheets and the Apps Script editor on a computer; step 8 is on the device you will log from.</p>
+  <p>Eight steps. Steps 2 to 7 happen inside Google Sheets and the Apps Script editor, easiest on a computer; step 8 is on the device you will log from.</p>
 
   <ol class="steps">
     <li>
@@ -77,14 +77,14 @@
     </li>
     <li>
       <h3>Set your token</h3>
-      <p>Click the gear (<b>Project Settings</b>) in the left bar, scroll to <b>Script Properties</b>, and click <b>Add script property</b>. Property name <code>APOLLO_TOKEN</code>. Value: a secret of your own made of <b>lowercase letters and digits only</b>, at least twenty characters. Click <b>Save script properties</b>.</p>
-      <p class="note">The token is the only lock on your data. Other characters have broken the link between app and sheet before, so stick to letters and digits.</p>
+      <p>Click the gear (<b>Project Settings</b>) in the left bar, scroll to <b>Script Properties</b>, and click <b>Add script property</b>. Property name <code>APOLLO_TOKEN</code>. Value: a secret of your own made of <b>lowercase letters and digits only</b>. Eight or more characters is plenty; it guards a training log, not a bank account. Click <b>Save script properties</b>.</p>
+      <p class="note">Other characters have broken the link between app and sheet before, so stick to letters and digits.</p>
       <figure class="capture">Screen capture to add: Script Properties with APOLLO_TOKEN added, value blurred.</figure>
     </li>
     <li>
       <h3>Run it once to grant permissions</h3>
-      <p>Back in the editor, pick <code>refresh</code> in the function dropdown next to <b>Run</b> and click <b>Run</b>. Google asks you to authorise the script. If it warns that the app is unverified, choose <b>Advanced</b>, then <b>Go to Apollo</b>. When the run finishes, your sheet's summary tab is filled in.</p>
-      <figure class="capture">Screen capture to add: the authorisation prompt with Advanced expanded.</figure>
+      <p>Back in the editor, pick <code>refresh</code> in the function dropdown next to <b>Run</b> and click <b>Run</b>. Google asks you to authorize the script. If it warns that the app is unverified, choose <b>Advanced</b>, then <b>Go to Apollo</b>. When the run finishes, your sheet's summary tab is filled in.</p>
+      <figure class="capture">Screen capture to add: the authorization prompt with Advanced expanded.</figure>
     </li>
     <li>
       <h3>Deploy the web app</h3>
@@ -93,7 +93,7 @@
     </li>
     <li>
       <h3>Connect your device</h3>
-      <p>Reload the sheet in your browser. An <b>Apollo</b> menu appears. Choose <b>Apollo → Connect device</b>. The dialog shows a link that opens the app with your sheet's connection filled in. Send that link to your phone and open it, or tap <b>Open on this device</b> if you are already on it. The app opens connected and shows your status. Then add it to your home screen: on iPhone <b>Share → Add to Home Screen</b>, on Android use the install prompt or the browser menu's <b>Install app</b>.</p>
+      <p>Reload the sheet in your browser. An <b>Apollo</b> menu appears. Choose <b>Apollo → Connect device</b>. The dialog shows a link that opens the app with your sheet's connection filled in. Open that link on the device you will log from, or click <b>Open on this device</b> if that is the one. The app opens connected and shows your status. Then add it to your home screen: on iPhone or iPad <b>Share → Add to Home Screen</b>, on Android the install prompt or the browser menu's <b>Install app</b>, on a computer the browser's install option or a bookmark.</p>
       <p class="note">That link contains your token. Send it only to yourself.</p>
       <figure><img src="img/status.png" alt="The Status screen after the first sync" loading="lazy"><figcaption>Status after the first sync. With an empty log every event is overdue until you backfill it, see Your records below.</figcaption></figure>
     </li>
@@ -106,7 +106,7 @@
   <p>Pick <b>Flight</b>, <b>Sim</b> or <b>Ground</b>. Flight needs a mission number; the date defaults to today's Zulu date. Then find each event in the list, by name or by Task ID, and tap <b>+</b> once per time you did it. Three landings are three taps. <b>Save</b> writes one row per tap into your sheet. If you have no signal, the rows wait on the device and go when you do; the Status screen says how many are waiting.</p>
   <figure><img src="img/log.png" alt="The Log screen with two landings tapped" loading="lazy"><figcaption>Two landings on mission 0123, ready to save.</figcaption></figure>
   <h3>Status</h3>
-  <p>Your events, overdue first, then by due date. The badge colour is the same as in the sheet: grey is overdue, red is due within 30 days, orange within 60, yellow within 90. Under each event: when you last did it, and for volume events how many of the year's requirement you have so far.</p>
+  <p>Your events, overdue first, then by due date. The badge color is the same as in the sheet: gray is overdue, red is due within 30 days, orange within 60, yellow within 90. Under each event: when you last did it, and for volume events how many of the year's requirement you have so far.</p>
   <h3>Settings</h3>
   <p>The gear in the top corner. Here you can see when the app last synced, switch the look between Light, Dark and Auto, and clear the app's local data from the device. Clearing never touches your sheet.</p>
   <figure><img src="img/settings.png" alt="The Settings screen" loading="lazy"><figcaption>Settings. The connection is filled in by the Connect device link; you should not need to type it.</figcaption></figure>
@@ -115,21 +115,21 @@
 <section id="records">
   <h2>Your records</h2>
   <h3>Backfill from your ITS</h3>
-  <p>A new sheet knows nothing, so every event shows overdue. Fix that once by typing your history into the <b>Training Log</b> tab of your sheet: one row per event with the <b>last date</b> you did it, Training ID in column A, date in column B as <code>2026-09-18</code>, and for flying events any mission number you like in column C. Use a marker such as <code>ITS20261006</code> so you can tell imported rows from logged ones later. Ground events leave the mission blank. You do not need the whole history, only the most recent date for each event, plus every row since 1 October for the current year's volume.</p>
+  <p>A new sheet knows nothing, so every event shows overdue. Fix that once by typing your history into the <b>Training Log</b> tab of your sheet, one row per event: the Training ID in column A, the <b>most recent date</b> you did it in column B, and for flying events something in column C. Apollo does not care what the mission number on an imported row says; it is a note to your future self that the row came from your ITS rather than a sortie, so write something plain such as <code>ITS import 6 Oct 26</code>. Ground events leave column C blank. You do not need the whole history, only the latest date for each event, plus every event since 1 October so the current year's volume is right.</p>
   <h3>The sheet is the record</h3>
-  <p>You can add, fix or delete rows in the Training Log by hand at any time. The summary recalculates whenever the sheet is edited, opened, or synced. Type dates as <code>YYYY-MM-DD</code>; the sheet has a US locale and would read 05/10/2026 as May 10th.</p>
+  <p>You can add, fix or delete rows in the Training Log by hand at any time. The summary recalculates whenever the sheet is edited, opened, or synced. Type dates any way Sheets recognizes, such as <code>2026-10-05</code> or <code>5 Oct 2026</code>; the column shows them as yyyy-mm-dd. Avoid all-numeric dates like 05/10/2026, which the sheet reads month-first.</p>
   <h3>The log check</h3>
   <p>After every refresh the sheet checks the log and shows a small message if a row needs attention: a Training ID that is not in either config tab, a date it cannot read, a date in the future, or a mission number that looks like <code>SIM</code> but is not exactly <code>SIM</code>. The same list appears on the app's Status screen. The check reports; it never changes your rows.</p>
   <h3>Two things not to do</h3>
   <ul>
-    <li>Do not use <b>Format → Convert to table</b> on any tab. A Google Sheets Table takes over the header row and the script cannot write through it. Colours, widths and number formats are fine.</li>
+    <li>Do not use <b>Format → Convert to table</b> on any tab. A Google Sheets Table takes over the header row and the script cannot write through it. Colors, widths and number formats are fine.</li>
     <li>Do not rename tabs or header cells. The script finds everything by those names.</li>
   </ul>
 </section>
 
 <section id="updates">
   <h2>Updates</h2>
-  <p><b>The app updates itself.</b> When a new version is published, your phone fetches it the next time you open the app and shows it the time after that. The version number is at the bottom of Settings.</p>
+  <p><b>The app updates itself.</b> When a new version is published, your device fetches it the next time you open the app and shows it the time after that. The version number is at the bottom of Settings.</p>
   <p><b>The script updates when you paste it.</b> Your sheet's script is your own copy, so when the script changes you repeat two steps: paste the current <b>Code.js</b> and <b>rules.js</b> from <a href="#code">the code section</a> over your two files and save, then <b>Deploy → Manage deployments → pencil → Version: New version → Deploy</b>. Your URL and token do not change. Skipping the new-version step is the most common mistake: the sheet runs the new code while the app still gets the old one.</p>
 </section>
 
@@ -141,8 +141,8 @@
     <dt>The summary tab's columns are in a different order after the app syncs</dt><dd>The deployed web app is on an older version than the editor. Deploy a new version, then Apollo → Refresh.</dd>
     <dt>The summary tab shows "Column 1, Column 2…" or is empty</dt><dd>A Table was put on that tab. The script rebuilds it on the next refresh; do not convert it to a Table again.</dd>
     <dt>The app shows "No events" or an old summary</dt><dd>Open Settings and tap Sync now. If you have no signal, it will sync when you do.</dd>
-    <dt>The home-screen icon did not change after an update</dt><dd>iPhone copies the icon when you add the app and never refreshes it. Remove it from the home screen and add it again from Safari.</dd>
-    <dt>A row I typed is ignored</dt><dd>Read the log check message after Apollo → Refresh. Usually the Training ID has a typo or the date is not in <code>YYYY-MM-DD</code> form.</dd>
+    <dt>The home-screen icon did not change after an update</dt><dd>iPhone and iPad copy the icon when you add the app and never refresh it. Remove it from the home screen and add it again from Safari. Android and desktop browsers update it on their own.</dd>
+    <dt>A row I typed is ignored</dt><dd>Read the log check message after Apollo → Refresh. Usually the Training ID has a typo or the date cell holds text the sheet did not recognize as a date.</dd>
   </dl>
 </section>
 

@@ -1,12 +1,12 @@
 # Apollo
 
-Personal KC-135 aircrew training tracker. A phone PWA logs training events into a Google Sheets workbook. A script inside the workbook works out currency, due dates and volume and writes them to a summary tab.
+Personal KC-135 aircrew training tracker. A PWA on any device logs training events into a Google Sheets workbook. A script inside the workbook works out currency, due dates and volume and writes them to a summary tab.
 
 ## The three project rules
 
 1. **SIMPLE.** The log is three columns, one accomplishment per row. Plain HTML/CSS/JS, no framework, no build step, no runtime dependencies. When in doubt, choose fewer columns, files and features.
-2. **FUTURE-PROOF.** Everything the app knows about training requirements comes from the two config tabs. Aircrew will edit those tabs for years, in the RTM's own plain words. An RTM change must never need a code change. Never hardcode a Task ID, a task name, or behaviour for one specific event.
-3. **ZULU.** Every date and time in the log, the summary, the API and the app is Zulu (UTC). No exceptions. "Today" is the UTC date, never the phone's or the spreadsheet's local date. A sortie is logged on its Zulu date.
+2. **FUTURE-PROOF.** Everything the app knows about training requirements comes from the two config tabs. Aircrew will edit those tabs for years, in the RTM's own plain words. An RTM change must never need a code change. Never hardcode a Task ID, a task name, or behavior for one specific event.
+3. **ZULU.** Every date and time in the log, the summary, the API and the app is Zulu (UTC). No exceptions. "Today" is the UTC date, never the device's or the spreadsheet's local date. A sortie is logged on its Zulu date.
 
 Ask the user before adding anything that is not in this file. Ideas that were discussed and not adopted are listed under "Parked" at the end; do not build them without asking.
 
@@ -29,7 +29,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
 | `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Remaining, Remaining Sim Credit |
 
-**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colours, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab is lost on the next refresh because the tab is cleared and rewritten.
+**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab is lost on the next refresh because the tab is cleared and rewritten.
 
 ### Training Log
 
@@ -40,7 +40,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 - A row whose Training ID is not in either config tab is kept and ignored. Training IDs are matched trimmed and case-insensitive.
 - A row whose Date cannot be read as a date is ignored.
 - The script writes the three headers if row 1 is empty and keeps the Mission Number column formatted as plain text.
-- **Typing dates by hand:** dates are Zulu dates. The workbook has a US locale, so `05/10/2026` is read as 10 May. Type `2026-10-05`. The app always sends that format.
+- **Typing dates by hand:** anything Sheets recognizes as a date works (`2026-10-05`, `5 Oct 2026`); the column displays `yyyy-mm-dd` and the script reads the date value, not the text. Avoid all-numeric `05/10/2026`, which the US locale reads month-first. The app always sends `YYYY-MM-DD`.
 
 ### Log check
 
@@ -157,13 +157,13 @@ Ground rows leave all four volume columns blank.
 
 In the sheet, Task ID through Overdue are written as plain text, so dates stay `YYYY-MM-DD` and `CHECK LABEL` stays as written. The numeric columns are numbers.
 
-### Due Date colours
+### Due Date colors
 
 The script writes conditional formatting on the Due Date column on every refresh, so it survives the rewrite and travels with the template. Display only; no rule lives here. First match wins.
 
-| Band | Test | Colour |
+| Band | Test | Color |
 |---|---|---|
-| Overdue | Overdue column is `YES` (so never-logged events go grey too) | `#666666` background, white text |
+| Overdue | Overdue column is `YES` (so never-logged events go gray too) | `#666666` background, white text |
 | Due in 30 days or less | Due Date minus TODAY() is 30 or less | `#EA9999` |
 | Due in 60 days or less | 60 or less | `#F9CB9C` |
 | Due in 90 days or less | 90 or less | `#FFF2CC` |
@@ -200,7 +200,7 @@ tests/browser/            smoke.js drives the app in Chromium against mock-api.j
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
 - **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code.
-- **Refresh** rewrites the Individual Training Summary, reapplies its Due Date colours, and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
+- **Refresh** rewrites the Individual Training Summary, reapplies its Due Date colors, and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
 - **The app is offline-first.** A log entry goes into a local queue at once and syncs when there is a connection. Config, summary and queue are kept in `localStorage`.
 
 ### Web app API
@@ -214,22 +214,22 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
   - `summary` is one object per summary row, keyed by the summary tab's column headers.
   - `logCheck` is `[{ row, mission, date, id, problem }]` from the log check above, empty when the log is clean. `row` is the sheet row number.
 - `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows, refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
-- **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. The app stores the web app URL and token from its Settings screen. Never commit either.
+- **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. Eight or more characters is enough; it guards a training log. The app stores the web app URL and token from its Settings screen. Never commit either.
 - **Retry safety without extra log columns:** the script keeps the last 50 `batchId` values in Script Properties under `APOLLO_BATCH_IDS`. A repeated `batchId` appends nothing and returns success. Appends and refreshes run under `LockService`.
 
 ### The app (three screens)
 
-**Design system.** The app follows the user's Show Time PWA (github.com/135crewdog/showtime), an iOS-style system: system font stack, antialiased; a white (dark: `#1c1c1e`) header with the 34px bold title on the left and a round 40px gear button on the right; an iOS segmented control under the header switching Log and Status, with swipe between the two panels (horizontal movement must dominate, 50px threshold, 0.3s slide); content in sections with 13px uppercase letter-spaced grey titles over rounded 10px cards with a 1px border; 17px inputs on a grey fill with 10px radius; full-width 12px-radius buttons; Settings as its own full screen with "Done" on the left and a centred title; a Light/Dark/Auto theme setting; the app is a 430px column centred on the page, so it stays phone-shaped in a desktop browser, with the page behind it in the elevated colour; Apple's grey palette for backgrounds, borders, fills and secondary text (`#f2f2f7`, `#ffffff`, `#c6c6c8`, `#8e8e93`, `#e5e5ea`; dark `#000000`, `#1c1c1e`, `#38383a`, `#98989d`, `#48484a`). Where Show Time uses iOS blue, Apollo uses the due-date palette: red `#EA9999` for primary buttons, orange `#F9CB9C` for the active kind and a picked stepper, yellow `#FFF2CC` and grey `#666666` where the bands already apply, with dark text on all of them. The Save bar is a fixed toolbar at the bottom of the Log panel, the one place Apollo departs from Show Time's in-flow buttons, because the event list is long. Every list row leads with the Task Name and puts the Task ID beneath it in grey, on Log and Status alike; search matches either. Every date a human reads in the app is `DD-Mmm-YY` (`07-Oct-26`): due dates, Last Accomplished, "As of", last sync, and the date field, which shows that label over the native picker while its value stays `YYYY-MM-DD`.
+**Design system.** The app follows the user's Show Time PWA (github.com/135crewdog/showtime), an iOS-style system: system font stack, antialiased; a white (dark: `#1c1c1e`) header with the 34px bold title on the left and a round 40px gear button on the right; an iOS segmented control under the header switching Log and Status, with swipe between the two panels (horizontal movement must dominate, 50px threshold, 0.3s slide); content in sections with 13px uppercase letter-spaced gray titles over rounded 10px cards with a 1px border; 17px inputs on a gray fill with 10px radius; full-width 12px-radius buttons; Settings as its own full screen with "Done" on the left and a centered title; a Light/Dark/Auto theme setting; the app is a 430px column centered on the page, so it stays narrow in a desktop browser, with the page behind it in the elevated color; Apple's gray palette for backgrounds, borders, fills and secondary text (`#f2f2f7`, `#ffffff`, `#c6c6c8`, `#8e8e93`, `#e5e5ea`; dark `#000000`, `#1c1c1e`, `#38383a`, `#98989d`, `#48484a`). Where Show Time uses iOS blue, Apollo uses the due-date palette: red `#EA9999` for primary buttons, orange `#F9CB9C` for the active kind and a picked stepper, yellow `#FFF2CC` and gray `#666666` where the bands already apply, with dark text on all of them. The Save bar is a fixed toolbar at the bottom of the Log panel, the one place Apollo departs from Show Time's in-flow buttons, because the event list is long. Every list row leads with the Task Name and puts the Task ID beneath it in gray, on Log and Status alike; search matches either. Every date a human reads in the app is `DD-Mmm-YY` (`07-Oct-26`): due dates, Last Accomplished, "As of", last sync, and the date field, which shows that label over the native picker while its value stays `YYYY-MM-DD`.
 
 - **Log:** pick Flight, Sim or Ground. Flight needs a mission number and date. Sim needs a date and writes `SIM` as the mission number. Ground needs a date only. Then a searchable list of events from the matching config tab, each with + and −, under small headings by RTM category (the first two characters of the Task ID; groups in the order they first appear in the config, events in config order within a group). Save writes one row per tap. In Sim, events with 0% sim credit are not offered. The date defaults to the Zulu date. Flight refuses a mission number of `SIM`. Changing the kind clears the counts.
-- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, and the log check problems if there are any. Order within the list: Overdue rows, then `CHECK LABEL` rows, then rows with a due date ascending, then rows with no due date; ties keep config order. Each row shows the Task Name over the Task ID, the due date as `DD-Mmm-YY` with the same colour bands as the sheet's Due Date column, Last Accomplished or "Never logged", and the volume line when the event has one.
+- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, and the log check problems if there are any. Order within the list: Overdue rows, then `CHECK LABEL` rows, then rows with a due date ascending, then rows with no due date; ties keep config order. Each row shows the Task Name over the Task ID, the due date as `DD-Mmm-YY` with the same color bands as the sheet's Due Date column, Last Accomplished or "Never logged", and the volume line when the event has one.
 - **Settings:** its own screen, opened from the gear and closed with Done. Sections: Connection (web app URL, token, Show token, Save, Sync now, last sync and last error), Appearance (Theme: Light, Dark, Auto), Data (Clear local data, asks first; the workbook is never touched), Help (Setup guide, Send Feedback), and the version. The app opens on Settings until a URL and token are saved.
 
 **Sync.** Save puts the rows into the local queue as one batch with a fresh `batchId` and tries to sync at once. Sync sends queued batches in order with POST, then, if nothing was sent, refreshes with GET. It runs on load, after Save, when the browser comes back online, when the app becomes visible with rows waiting, and from Sync now. A network failure keeps the queue and says so; a `{ ok: false }` reply keeps the queue and shows the error. The payload from the last successful call is what Status shows.
 
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`) and `apollo.queue` (`[{ batchId, rows }]`).
 
-**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline: pages are network-first with the cached page as the offline fallback, assets are served from cache and refreshed in the background; API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or phones keep the old copy.
+**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline: pages are network-first with the cached page as the offline fallback, assets are served from cache and refreshed in the background; API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
 
 ## Sharing (milestone 3)
 
@@ -239,7 +239,7 @@ Sharing Apollo is sending someone one link: the guide at `https://135crewdog.git
 
 **The template workbook** is script-free: a Google Sheet named "Apollo Template" (id `1ucCJ4fbnNOwo-326-TFRMtDzrQlxeDYF2IdJGExgevg`) with the four tabs, their headers, frozen header rows, the UTC time zone, the Mission Number column as plain text, dates as `yyyy-mm-dd`, and the MP / FTL A config as the seed. Nothing in it changes when the code changes. It is offered through its `/copy` URL, which asks the recipient to make their own copy; it must be shared as "Anyone with the link: Viewer" for that to work. Because it carries no script, copying it shows no Apps Script warning and no code can go stale inside it.
 
-**A new user:** copy the template, paste the two files from the guide into Apps Script, set `APOLLO_TOKEN`, run `refresh` once to authorise, deploy the web app (Execute as Me, Anyone), then Apollo → Connect device and open the link on the device. The same paste-and-new-version procedure is how every user takes a script update, and the guide's Updates section says so.
+**A new user:** copy the template, paste the two files from the guide into Apps Script, set `APOLLO_TOKEN`, run `refresh` once to authorize, deploy the web app (Execute as Me, Anyone), then Apollo → Connect device and open the link on the device. The same paste-and-new-version procedure is how every user takes a script update, and the guide's Updates section says so.
 
 **The handoff link.** Apollo → Connect device in the sheet shows `https://135crewdog.github.io/apollo/#url=<web app URL>&token=<token>`, with Copy and Open buttons. The URL comes from `ScriptApp.getService().getUrl()` (a `/dev` ending is swapped for `/exec`) and the token from Script Properties; if either is missing the dialog says which step is left instead. The app reads the fragment on load and on `hashchange`, saves the connection, strips the fragment from the address bar with `history.replaceState`, closes Settings, shows "Connected to the workbook" and syncs. The connection travels in the fragment on purpose: browsers never send a fragment to the server, so GitHub Pages never sees the token. The link still contains the token, so it is for the owner's own devices only.
 
@@ -252,7 +252,7 @@ Sharing Apollo is sending someone one link: the guide at `https://135crewdog.git
 - **Volume Required** may arrive as a number, a numeric string, blank, or text such as `X`.
 - **Mission Number must be stored as plain text**, so values like `0123` or `1E5` are not altered by Sheets.
 - **POST with `Content-Type: text/plain`.** Apps Script does not answer CORS preflight requests, and `application/json` triggers one.
-- **A native date input shows the phone's date format** (10/07/2026 on a US phone) but its value is always `YYYY-MM-DD`; the app reads the value, never the display.
+- **A native date input shows the device's date format** (10/07/2026 on a US device) but its value is always `YYYY-MM-DD`; the app reads the value, never the display.
 - **Bump both version strings** (`sw.js` `VERSION`, `app.js` `APP_VERSION`) with every change under `app/`.
 - **No Google Sheets Tables anywhere in the workbook.** See "The workbook". Note for anyone touching the sheet through the Sheets API: `deleteTable` clears the Table's cells as well, so read the values first and write them back.
 - The summary tab is script-owned. Never put formulas or user data there.

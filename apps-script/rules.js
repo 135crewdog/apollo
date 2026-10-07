@@ -134,7 +134,7 @@ function endOfNextPeriod(ymd, monthsPerPeriod) {
  *   'months'  n = months to add
  *   'days'    n = days to add
  *   'none'    no due date
- *   'unknown' unrecognised label
+ *   'unknown' unrecognized label
  */
 function classifyLabel(label) {
   var s = String(label == null ? '' : label).trim().toLowerCase().replace(/\s+/g, ' ');
@@ -203,17 +203,17 @@ function rowKind(missionNumber) {
  */
 function parsePercent(value) {
   if (value == null || value === '') return 0;
-  if (typeof value === 'number') return normalisePercent(value);
+  if (typeof value === 'number') return normalizePercent(value);
   var s = String(value).trim();
   if (s === '') return 0;
   var isPercent = /%$/.test(s);
   var n = Number(s.replace(/%$/, '').trim());
   if (isNaN(n)) return 0;
   if (isPercent) return n / 100;
-  return normalisePercent(n);
+  return normalizePercent(n);
 }
 
-function normalisePercent(n) {
+function normalizePercent(n) {
   if (isNaN(n) || n <= 0) return 0;
   return n > 1 ? n / 100 : n;
 }
@@ -226,7 +226,7 @@ function parseVolume(value) {
   return n;
 }
 
-function normaliseId(id) {
+function normalizeId(id) {
   return String(id == null ? '' : id).trim().toUpperCase();
 }
 
@@ -324,14 +324,14 @@ function summarizeEvent(event, rows, today) {
 function buildSummary(ground, flying, log, today) {
   var byId = {};
   for (var i = 0; i < log.length; i++) {
-    var key = normaliseId(log[i].id);
+    var key = normalizeId(log[i].id);
     if (!byId[key]) byId[key] = [];
     byId[key].push(log[i]);
   }
   var out = [];
   var push = function (event, type) {
     event.type = type;
-    out.push(summarizeEvent(event, byId[normaliseId(event.id)] || [], today));
+    out.push(summarizeEvent(event, byId[normalizeId(event.id)] || [], today));
   };
   for (i = 0; i < ground.length; i++) push(ground[i], 'ground');
   for (i = 0; i < flying.length; i++) push(flying[i], 'flying');
@@ -352,11 +352,11 @@ function buildSummary(ground, flying, log, today) {
 function checkLog(log, ground, flying, today) {
   var known = {};
   var events = ground.concat(flying);
-  for (var e = 0; e < events.length; e++) known[normaliseId(events[e].id)] = true;
+  for (var e = 0; e < events.length; e++) known[normalizeId(events[e].id)] = true;
   var out = [];
   for (var i = 0; i < log.length; i++) {
     var entry = log[i];
-    var id = normaliseId(entry.id);
+    var id = normalizeId(entry.id);
     var date = parseDate(entry.date);
     var mission = String(entry.mission == null ? '' : entry.mission).trim();
     var problem = '';
