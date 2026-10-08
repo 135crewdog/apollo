@@ -18,7 +18,7 @@ var SUMMARY_HEADERS = [
   'Overdue',
   'Volume Accomplished',
   'Volume Required',
-  'Percent Remaining',
+  'Percent Complete',
   'Remaining Sim Credit'
 ];
 
@@ -242,7 +242,7 @@ function normalizeId(id) {
  * today: 'YYYY-MM-DD' in the spreadsheet's time zone
  *
  * Returns an object whose keys match SUMMARY_HEADERS; see summaryRowToArray.
- * Percent Remaining is a fraction (0.5 for 50%).
+ * Percent Complete is a fraction (0.5 for 50%), capped at 1.
  */
 function summarizeEvent(event, rows, today) {
   var isFlying = event.type === 'flying';
@@ -294,7 +294,7 @@ function summarizeEvent(event, rows, today) {
     'Overdue': overdue,
     'Volume Accomplished': '',
     'Volume Required': '',
-    'Percent Remaining': '',
+    'Percent Complete': '',
     'Remaining Sim Credit': ''
   };
 
@@ -309,7 +309,7 @@ function summarizeEvent(event, rows, today) {
   var accomplished = aircraftThisFy + Math.min(simThisFy, cap);
   row['Volume Accomplished'] = accomplished;
   row['Volume Required'] = required;
-  row['Percent Remaining'] = Math.max(0, required - accomplished) / required;
+  row['Percent Complete'] = Math.min(1, accomplished / required);
   row['Remaining Sim Credit'] = Math.max(0, Math.min(required - accomplished, cap - simThisFy));
   return row;
 }

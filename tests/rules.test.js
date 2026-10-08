@@ -126,11 +126,11 @@ function expectedNumber(text) {
 }
 
 const VOLUME_CASES = [
-  // [Event setup (volume, sim), Rows this FY (sim, aircraft), Accomplished, Percent Remaining, Remaining Sim Credit]
+  // [Event setup (volume, sim), Rows this FY (sim, aircraft), Accomplished, Percent Complete, Remaining Sim Credit]
   { setup: [4, 0.5], rows: [3, 0], accomplished: '2', percent: '50%', simCredit: '0' },
   { setup: [4, 0.5], rows: [1, 1], accomplished: '2', percent: '50%', simCredit: '1' },
-  { setup: [12, 1], rows: [5, 4], accomplished: '9', percent: '25%', simCredit: '3' },
-  { setup: [2, 0], rows: [2, 0], accomplished: '0', percent: '100%', simCredit: '0', lastAccomplished: '' },
+  { setup: [12, 1], rows: [5, 4], accomplished: '9', percent: '75%', simCredit: '3' },
+  { setup: [2, 0], rows: [2, 0], accomplished: '0', percent: '0%', simCredit: '0', lastAccomplished: '' },
   { setup: ['X', 1], rows: [0, 1], accomplished: '1', percent: 'blank', simCredit: 'blank' },
 ];
 
@@ -140,7 +140,7 @@ test('volume: required test cases', () => {
     const row = rules.summarizeEvent(event, rowsThisFy(c.rows[0], c.rows[1]), TODAY);
     const label = `Volume ${c.setup[0]}, sim ${c.setup[1]}, ${c.rows[0]} SIM, ${c.rows[1]} aircraft`;
     assert.equal(row['Volume Accomplished'], expectedNumber(c.accomplished), `${label}: Accomplished`);
-    assert.equal(row['Percent Remaining'], expectedPercent(c.percent), `${label}: Percent Remaining`);
+    assert.equal(row['Percent Complete'], expectedPercent(c.percent), `${label}: Percent Complete`);
     assert.equal(row['Remaining Sim Credit'], expectedNumber(c.simCredit), `${label}: Remaining Sim Credit`);
     if ('lastAccomplished' in c) {
       assert.equal(row['Last Accomplished'], c.lastAccomplished, `${label}: Last Accomplished`);
@@ -152,7 +152,7 @@ test('volume: Volume 12, sim 100%, 1 aircraft dated 2026-09-30 (last FY)', () =>
   const row = rules.summarizeEvent(flyingEvent(12, 1), [{ mission: '1234', date: '2026-09-30', id: 'F1' }], TODAY);
   assert.equal(row['Volume Accomplished'], 0);
   assert.equal(row['Last Accomplished'], '2026-09-30');
-  assert.equal(row['Percent Remaining'], expectedPercent('100%'));
+  assert.equal(row['Percent Complete'], expectedPercent('0%'));
   assert.equal(row['Remaining Sim Credit'], 12);
 });
 
@@ -166,7 +166,7 @@ test('volume: blank Volume Required counts rows that count this FY', () => {
   const row = rules.summarizeEvent(flyingEvent('', 1), rowsThisFy(2, 1), TODAY);
   assert.equal(row['Volume Required'], '');
   assert.equal(row['Volume Accomplished'], 3);
-  assert.equal(row['Percent Remaining'], '');
+  assert.equal(row['Percent Complete'], '');
   assert.equal(row['Remaining Sim Credit'], '');
   // At 0% sim, SIM rows do not count even in the plain count.
   const row0 = rules.summarizeEvent(flyingEvent('', 0), rowsThisFy(2, 1), TODAY);
@@ -269,7 +269,7 @@ test('ground event: every row counts whatever the mission number, volume columns
   assert.equal(row['Overdue'], '');
   assert.equal(row['Volume Accomplished'], '');
   assert.equal(row['Volume Required'], '');
-  assert.equal(row['Percent Remaining'], '');
+  assert.equal(row['Percent Complete'], '');
   assert.equal(row['Remaining Sim Credit'], '');
 });
 
@@ -410,7 +410,7 @@ test('checkLog: a clean log reports nothing, and a date equal to today is fine',
 test('SUMMARY_HEADERS: Task ID leads, then the CLAUDE.md columns', () => {
   assert.deepEqual(rules.SUMMARY_HEADERS, [
     'Task ID', 'Task Name', 'Last Accomplished', 'Due Date', 'Overdue',
-    'Volume Accomplished', 'Volume Required', 'Percent Remaining', 'Remaining Sim Credit',
+    'Volume Accomplished', 'Volume Required', 'Percent Complete', 'Remaining Sim Credit',
   ]);
 });
 
