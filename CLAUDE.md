@@ -27,7 +27,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 | `Training Log` | the app, and the user by hand | Training ID, Date, Mission Number |
 | `Ground Training Config` | the user | Task ID, Task Name, Frequency |
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
-| `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Remaining, Remaining Sim Credit |
+| `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Complete, Remaining Sim Credit |
 
 **Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab, a filter or sort included, is lost on the next refresh because the tab is cleared and rewritten. Sorting the summary by hand while a refresh runs once left eleven rows duplicated and eleven missing; the Status screen in the app is where the sorted view lives.
 
@@ -148,9 +148,9 @@ These are checked against the RTM. If the code disagrees with this table, the co
 | Last Accomplished | Latest date among the rows that count. Blank if none. |
 | Due Date | From the label table above. Blank if there is no Last Accomplished, except that `CHECK LABEL` shows whether or not the event has been logged, so a mistyped label is visible at once. |
 | Overdue | `YES` if Due Date is before today, or if the label produces due dates and the event has never been logged. Otherwise blank. Never `YES` for `CHECK LABEL`. |
-| Volume Required | The config value if it is a number above 0. Anything else (blank, `X`) means nothing to count: this column, Percent Remaining and Remaining Sim Credit are blank, and Volume Accomplished shows the plain count of rows that count this FY. |
+| Volume Required | The config value if it is a number above 0. Anything else (blank, `X`) means nothing to count: this column, Percent Complete and Remaining Sim Credit are blank, and Volume Accomplished shows the plain count of rows that count this FY. |
 | Volume Accomplished | Aircraft rows this FY + SIM rows this FY, with SIM rows capped at `floor(Volume Required × Percent Credit in Sim)`. |
-| Percent Remaining | `max(0, Required − Accomplished) / Required`, stored as a fraction (0.5) and shown as a percent (50%) by the column's number format. The API returns the fraction. |
+| Percent Complete | `min(1, Accomplished / Required)`, stored as a fraction (0.5) and shown as a percent (50%) by the column's number format. The API returns the fraction. It was Percent Remaining until 2026-10-08; the user chose "complete" and the test table below was converted (100 − remaining). |
 | Remaining Sim Credit | `max(0, min(Required − Accomplished, cap − SIM rows this FY))` |
 
 Ground rows leave all four volume columns blank.
@@ -175,14 +175,14 @@ Sheets evaluates TODAY() in the workbook's time zone, which is UTC. Columns are 
 
 Today is 2026-10-05 (FY27) in all of these. The tests compare the fraction, so "50%" means 0.5.
 
-| Event setup | Rows this FY | Accomplished | Percent Remaining | Remaining Sim Credit |
+| Event setup | Rows this FY | Accomplished | Percent Complete | Remaining Sim Credit |
 |---|---|---|---|---|
 | Volume 4, sim 50% | 3 SIM | 2 | 50% | 0 |
 | Volume 4, sim 50% | 1 SIM, 1 aircraft | 2 | 50% | 1 |
-| Volume 12, sim 100% | 5 SIM, 4 aircraft | 9 | 25% | 3 |
-| Volume 2, sim 0% | 2 SIM | 0 (and Last Accomplished stays blank) | 100% | 0 |
+| Volume 12, sim 100% | 5 SIM, 4 aircraft | 9 | 75% | 3 |
+| Volume 2, sim 0% | 2 SIM | 0 (and Last Accomplished stays blank) | 0% | 0 |
 | Volume `X`, sim 100% | 1 aircraft | 1 | blank | blank |
-| Volume 12, sim 100% | 1 aircraft dated 2026-09-30 | 0 (last FY), but Last Accomplished = 2026-09-30 | 100% | 12 |
+| Volume 12, sim 100% | 1 aircraft dated 2026-09-30 | 0 (last FY), but Last Accomplished = 2026-09-30 | 0% | 12 |
 
 ## Architecture
 
@@ -222,7 +222,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 **Design system.** The app follows the user's Show Time PWA (github.com/135crewdog/showtime), an iOS-style system: system font stack, antialiased; a white (dark: `#1c1c1e`) header with the 34px bold title on the left and a round 40px gear button on the right; an iOS segmented control under the header switching Log and Status, with swipe between the two panels (horizontal movement must dominate, 50px threshold, 0.3s slide); content in sections with 13px uppercase letter-spaced gray titles over rounded 10px cards with a 1px border; 17px inputs on a gray fill with 10px radius; full-width 12px-radius buttons; Settings as its own full screen with "Done" on the left and a centered title; a Light/Dark/Auto theme setting; the app is a 430px column centered on the page, so it stays narrow in a desktop browser, with the page behind it in the elevated color; Apple's gray palette for backgrounds, borders, fills and secondary text (`#f2f2f7`, `#ffffff`, `#c6c6c8`, `#8e8e93`, `#e5e5ea`; dark `#000000`, `#1c1c1e`, `#38383a`, `#98989d`, `#48484a`). Where Show Time uses iOS blue, Apollo uses the due-date palette: red `#EA9999` for primary buttons, orange `#F9CB9C` for the active kind and a picked stepper, yellow `#FFF2CC` and gray `#666666` where the bands already apply, with dark text on all of them. The Save bar is a fixed toolbar at the bottom of the Log panel, the one place Apollo departs from Show Time's in-flow buttons, because the event list is long. Every list row leads with the Task Name and puts the Task ID beneath it in gray, on Log and Status alike; search matches either. Every date a human reads in the app is `DD-Mmm-YY` (`07-Oct-26`): due dates, Last Accomplished, "As of", last sync, and the date field, which shows that label over the native picker while its value stays `YYYY-MM-DD`.
 
 - **Log:** pick Flight, Sim or Ground. Flight needs a mission number and date. Sim needs a date and writes `SIM` as the mission number. Ground needs a date only. Then a searchable list of events from the matching config tab, each with + and −, under small headings by RTM category (the first two characters of the Task ID; groups in the order they first appear in the config, events in config order within a group). Save writes one row per tap. In Sim, events with 0% sim credit are not offered. The date defaults to the Zulu date. Flight refuses a mission number of `SIM`. Changing the kind clears the counts.
-- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, the log check problems if there are any, and a search field that narrows the list by Task Name or Task ID (the same match as the Log search), so "when did I last do X?" is one search away. Order within the list: Overdue rows, then `CHECK LABEL` rows, then rows with a due date ascending, then rows with no due date; ties keep config order. Each row shows the Task Name over the Task ID, the due date as `DD-Mmm-YY` with the same color bands as the sheet's Due Date column, Last Accomplished or "Never logged", and the volume line when the event has one.
+- **Status:** the summary, overdue first, then by due date, with its "as of" date, the number of rows waiting to sync, the log check problems if there are any, and a search field that narrows the list by Task Name or Task ID (the same match as the Log search), so "when did I last do X?" is one search away. Order within the list: Overdue rows, then `CHECK LABEL` rows, then rows with a due date ascending, then rows with no due date; ties keep config order. Each row shows the Task Name over the Task ID, the due date as `DD-Mmm-YY` with the same color bands as the sheet's Due Date column, Last Accomplished or "Never logged", and the volume line when the event has one (`2 of 12 this FY, 17% complete, 10 sim credit available`).
 - **Settings:** its own screen, opened from the gear and closed with Done. Sections: Connection (web app URL, token, Show token, Save, Sync now, last sync and last error), Appearance (Theme: Light, Dark, Auto), Data (Clear local data, asks first; the workbook is never touched), Help (Setup guide, Send Feedback), and the version. The app opens on Settings until a URL and token are saved.
 
 **Sync.** Save puts the rows into the local queue as one batch with a fresh `batchId` and tries to sync at once. Sync sends queued batches in order with POST, then, if nothing was sent, refreshes with GET. It runs on load, after Save, when the browser comes back online, when the app becomes visible with rows waiting, and from Sync now. A network failure keeps the queue and says so; a `{ ok: false }` reply keeps the queue and shows the error. The payload from the last successful call is what Status shows.

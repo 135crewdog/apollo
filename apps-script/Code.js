@@ -172,7 +172,7 @@ function fillSummary(sheet, values) {
   // Task Name .. Overdue are text so 'YYYY-MM-DD' and 'CHECK LABEL' are kept as written.
   sheet.getRange(1, 1, values.length, 5).setNumberFormat('@');
   if (values.length > 1) {
-    var pctCol = SUMMARY_HEADERS.indexOf('Percent Remaining') + 1;
+    var pctCol = SUMMARY_HEADERS.indexOf('Percent Complete') + 1;
     sheet.getRange(2, pctCol, values.length - 1, 1).setNumberFormat('0%');
   }
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);

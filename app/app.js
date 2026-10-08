@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.07.13';
+var APP_VERSION = '2026.10.08.1';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -182,11 +182,11 @@ function volumeText(row) {
   var req = row['Volume Required'];
   if (acc === '' || acc == null) return '';
   if (req === '' || req == null) return acc + ' this FY';
-  var pct = row['Percent Remaining'];
+  var pct = row['Percent Complete'];
   var text = acc + ' of ' + req + ' this FY';
-  if (typeof pct === 'number') text += ', ' + Math.round(pct * 100) + '% remaining';
+  if (typeof pct === 'number') text += ', ' + Math.round(pct * 100) + '% complete';
   var sim = row['Remaining Sim Credit'];
-  if (typeof sim === 'number' && sim > 0) text += ', ' + sim + ' sim credit left';
+  if (typeof sim === 'number' && sim > 0) text += ', ' + sim + ' sim credit available';
   return text;
 }
 

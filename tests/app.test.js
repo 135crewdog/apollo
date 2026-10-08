@@ -148,6 +148,6 @@ test('parseHandoff: reads url and token from the fragment, rejects anything else
 test('volumeText', () => {
   assert.equal(app.volumeText({ 'Volume Accomplished': '' }), '');
   assert.equal(app.volumeText({ 'Volume Accomplished': 3, 'Volume Required': '' }), '3 this FY');
-  assert.equal(app.volumeText({ 'Volume Accomplished': 2, 'Volume Required': 4, 'Percent Remaining': 0.5, 'Remaining Sim Credit': 1 }), '2 of 4 this FY, 50% remaining, 1 sim credit left');
-  assert.equal(app.volumeText({ 'Volume Accomplished': 4, 'Volume Required': 4, 'Percent Remaining': 0, 'Remaining Sim Credit': 0 }), '4 of 4 this FY, 0% remaining');
+  assert.equal(app.volumeText({ 'Volume Accomplished': 2, 'Volume Required': 4, 'Percent Complete': 0.5, 'Remaining Sim Credit': 1 }), '2 of 4 this FY, 50% complete, 1 sim credit available');
+  assert.equal(app.volumeText({ 'Volume Accomplished': 4, 'Volume Required': 4, 'Percent Complete': 1, 'Remaining Sim Credit': 0 }), '4 of 4 this FY, 100% complete');
 });
