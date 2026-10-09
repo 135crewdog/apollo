@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.08.1';
+var APP_VERSION = '2026.10.09.1';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -287,9 +287,10 @@ if (typeof document !== 'undefined') {
         ul.appendChild(el('li', 'empty', data.asOf ? 'No events in this config tab.' : 'No config yet. Open Settings, enter the web app URL and token, then Sync now.'));
         box.appendChild(ul);
       }
+      // One card per RTM group, no heading: the prefix means nothing to a user.
       groupEvents(events).forEach(function (g) {
-        box.appendChild(el('div', 'group', g.key));
         var ul = el('ul');
+        ul.dataset.group = g.key;
         g.events.forEach(function (e) { ul.appendChild(eventItem(e)); });
         box.appendChild(ul);
       });

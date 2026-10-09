@@ -180,10 +180,9 @@ label.check input { width: 20px; height: 20px; accent-color: var(--red); }
 }
 .toggle-group button.on { background: var(--orange); color: var(--on-accent); }
 
-/* Event list: one section per RTM group */
-#events .group { font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin: 16px 0 8px; }
-#events .group:first-child { margin-top: 0; }
-#events ul { list-style: none; background: var(--elev); border: 1px solid var(--border); border-radius: 10px; padding: 0 16px; }
+/* Event list: one card per RTM group, no headings */
+#events ul { list-style: none; background: var(--elev); border: 1px solid var(--border); border-radius: 10px; padding: 0 16px; margin-top: 12px; }
+#events ul:first-child { margin-top: 0; }
 .event { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .event:last-child { border-bottom: none; }
 .event .name { flex: 1; min-width: 0; }
