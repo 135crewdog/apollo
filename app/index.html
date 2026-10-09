@@ -2,11 +2,10 @@
 <html lang="en" data-theme="auto">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Apollo</title>
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Apollo">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -27,8 +26,7 @@
         <button type="button" role="tab" data-tab="status">Status</button>
       </div>
     </div>
-    <div id="panels" class="panels">
-      <div id="track" class="track">
+    <div id="panels">
 
         <section id="screen-log" class="panel" aria-label="Log">
           <div class="section">
@@ -62,7 +60,9 @@
             <input id="search" type="search" class="search" placeholder="Search events" autocomplete="off" aria-label="Search events">
             <div id="events"></div>
           </div>
-          <div class="panel-end"></div>
+          <div id="savebar" class="savebar">
+            <button type="button" id="save" class="btn primary" disabled>Save</button>
+          </div>
         </section>
 
         <section id="screen-status" class="panel" aria-label="Status">
@@ -71,13 +71,8 @@
           <div id="status-error"></div>
           <input id="status-search" type="search" class="search" placeholder="Search events" autocomplete="off" aria-label="Search status">
           <ul id="summary" class="card list"></ul>
-          <div class="panel-end"></div>
         </section>
 
-      </div>
-    </div>
-    <div id="savebar" class="savebar">
-      <button type="button" id="save" class="btn primary" disabled>Save</button>
     </div>
   </div>
 
@@ -136,7 +131,6 @@
         </div>
       </div>
       <p class="version">Apollo v<span id="version"></span> · all dates are Zulu</p>
-      <div class="panel-end"></div>
     </div>
   </div>
 
