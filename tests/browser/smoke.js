@@ -110,10 +110,11 @@ async function main() {
     assert.equal(await page.textContent('#date-display'), '03-Oct-26', 'display follows the picker');
     await page.fill('#date', TODAY);
     assert.equal(await page.locator('#events .event').count(), 3, 'all flying events in Flight');
-    assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL', 'AN', 'RT'], 'group headings by Task ID prefix');
+    assert.deepEqual(await page.locator('#events ul').evaluateAll((els) => els.map((u) => u.dataset.group)), ['AL', 'AN', 'RT'], 'one card per Task ID prefix, no headings');
+    assert.equal(await page.locator('#events .group').count(), 0, 'no group headings');
     await page.fill('#search', 'land');
     assert.equal(await page.locator('#events .event').count(), 1);
-    assert.deepEqual(await page.locator('#events .group').allTextContents(), ['AL'], 'only groups with matches keep a heading');
+    assert.deepEqual(await page.locator('#events ul').evaluateAll((els) => els.map((u) => u.dataset.group)), ['AL'], 'only groups with matches keep a card');
     await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
     await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
     assert.equal(await page.textContent('#save'), 'Save 2 rows');
