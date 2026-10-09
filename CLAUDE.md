@@ -87,8 +87,10 @@ Labels are matched trimmed and case-insensitive. Number labels are matched by pa
 | `Monthly`, `Quarterly`, `Semi-Annual` | Last day of the period after the one containing Last Accomplished |
 | `Annual`, `Biennial`, `Triennial` | 30 Sep of (FY of Last Accomplished + 1, 2, 3) |
 | `N Years` | 30 Sep of (FY of Last Accomplished + N) |
-| `N Months` | Same day of the month, N months later. If that day does not exist, the last day of that month. |
-| `N Days` | Last Accomplished + N days |
+| `N Months` | Last day of the month N months after Last Accomplished |
+| `N Days` | Last day of the month containing Last Accomplished + N days |
+
+ARMS, the system SARM reads, computes every interval to the last day of the month. SARM due dates for `6 Months`, `24 Months`, `48 Months` and `365 Days` events confirmed this on 2026-10-09; the rows marked SARM in the table below are those dates. Medical items tracked in ASIMS (the flight physical) follow their own convention and are not RTM events; see Gotchas.
 | `PCS`, `As Required`, `N/A`, blank | No due date |
 | anything else | Due Date shows `CHECK LABEL` |
 
@@ -120,13 +122,18 @@ These are checked against the RTM. If the code disagrees with this table, the co
 | 5 Years | 2021-10-01 | 2027-09-30 |
 | 5 Years | 2022-01-15 | 2027-09-30 |
 | 5 Years | 2022-09-30 | 2027-09-30 |
-| 60 Months | 2022-03-05 | 2027-03-05 |
-| 17 Months | 2025-06-10 | 2026-11-10 |
-| 24 Months | 2025-06-10 | 2027-06-10 |
+| 60 Months | 2022-03-05 | 2027-03-31 |
+| 60 Months | 2025-03-04 | 2030-03-31 (SARM) |
+| 17 Months | 2025-06-10 | 2026-11-30 |
+| 24 Months | 2025-06-10 | 2027-06-30 |
+| 24 Months | 2025-03-07 | 2027-03-31 (SARM) |
 | 6 Months | 2026-08-31 | 2027-02-28 |
+| 6 Months | 2026-05-18 | 2026-11-30 (SARM) |
 | 48 Months | 2024-02-29 | 2028-02-29 |
-| 455 Days | 2025-07-01 | 2026-09-29 |
-| 365 Days | 2026-01-15 | 2027-01-15 |
+| 48 Months | 2025-11-14 | 2029-11-30 (SARM) |
+| 455 Days | 2025-07-01 | 2026-09-30 |
+| 365 Days | 2026-01-15 | 2027-01-31 |
+| 365 Days | 2026-05-18 | 2027-05-31 (SARM) |
 | 365 Days | 2027-06-01 | 2028-05-31 |
 | PCS | 2026-01-01 | (none) |
 | As Required | 2026-01-01 | (none) |
@@ -256,6 +263,7 @@ Sharing Apollo is sending someone one link: the guide at `https://135crewdog.git
 - **Bump both version strings** (`sw.js` `VERSION`, `app.js` `APP_VERSION`) with every change under `app/`.
 - **No Google Sheets Tables anywhere in the workbook.** See "The workbook". Note for anyone touching the sheet through the Sheets API: `deleteTable` clears the Table's cells as well, so read the values first and write them back.
 - The summary tab is script-owned. Never put formulas or user data there.
+- **Non-RTM requirements** such as the flight physical (ASIMS) are not computed the ARMS way: SARM gave 2027-06-10 for an exam on 2026-03-13, which no interval label produces. Until a label kind exists for them, their due dates in Apollo are approximate.
 
 ## Deliberately not in the app
 
@@ -263,7 +271,6 @@ Do not add these. The user and their training office handle them.
 
 - A profile or settings tab in the workbook
 - Auto-credit: logging one event never credits another
-- Month-end rounding for `N Months` labels
 - Proration, waivers, deployment grace periods
 - The 6-month non-current / unqualified rule
 - The instructor 50% credit rule

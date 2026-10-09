@@ -92,6 +92,10 @@ function lastDayOfMonth(y, m) {
   return { y: y, m: m, d: daysInMonth(y, m) };
 }
 
+function endOfMonth(ymd) {
+  return lastDayOfMonth(ymd.y, ymd.m);
+}
+
 // ---------------------------------------------------------------------------
 // Fiscal year and periods
 // ---------------------------------------------------------------------------
@@ -176,10 +180,12 @@ function dueDate(label, lastAccomplished) {
       return formatDate(endOfNextPeriod(last, c.n));
     case 'fy':
       return formatDate(fiscalYearEnd(fiscalYear(last) + c.n));
+    // ARMS computes every interval to the last day of the month (confirmed against
+    // SARM due dates for 6, 24 and 48 Months and 365 Days on 2026-10-09).
     case 'months':
-      return formatDate(addMonths(last, c.n));
+      return formatDate(endOfMonth(addMonths(last, c.n)));
     case 'days':
-      return formatDate(addDays(last, c.n));
+      return formatDate(endOfMonth(addDays(last, c.n)));
   }
   return CHECK_LABEL;
 }

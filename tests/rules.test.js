@@ -29,13 +29,18 @@ const DUE_DATE_CASES = [
   ['5 Years', '2021-10-01', '2027-09-30'],
   ['5 Years', '2022-01-15', '2027-09-30'],
   ['5 Years', '2022-09-30', '2027-09-30'],
-  ['60 Months', '2022-03-05', '2027-03-05'],
-  ['17 Months', '2025-06-10', '2026-11-10'],
-  ['24 Months', '2025-06-10', '2027-06-10'],
+  ['60 Months', '2022-03-05', '2027-03-31'],
+  ['60 Months', '2025-03-04', '2030-03-31'], // SARM
+  ['17 Months', '2025-06-10', '2026-11-30'],
+  ['24 Months', '2025-06-10', '2027-06-30'],
+  ['24 Months', '2025-03-07', '2027-03-31'], // SARM
   ['6 Months', '2026-08-31', '2027-02-28'],
+  ['6 Months', '2026-05-18', '2026-11-30'], // SARM
   ['48 Months', '2024-02-29', '2028-02-29'],
-  ['455 Days', '2025-07-01', '2026-09-29'],
-  ['365 Days', '2026-01-15', '2027-01-15'],
+  ['48 Months', '2025-11-14', '2029-11-30'], // SARM
+  ['455 Days', '2025-07-01', '2026-09-30'],
+  ['365 Days', '2026-01-15', '2027-01-31'],
+  ['365 Days', '2026-05-18', '2027-05-31'], // SARM
   ['365 Days', '2027-06-01', '2028-05-31'],
   ['PCS', '2026-01-01', '(none)'],
   ['As Required', '2026-01-01', '(none)'],
@@ -55,7 +60,7 @@ test('due dates: labels are matched trimmed and case-insensitive', () => {
   assert.equal(rules.dueDate('SEMI-ANNUAL', '2026-02-10'), '2026-09-30');
   assert.equal(rules.dueDate('annual', '2026-09-30'), '2027-09-30');
   assert.equal(rules.dueDate('5 years', '2022-01-15'), '2027-09-30');
-  assert.equal(rules.dueDate(' 60 months ', '2022-03-05'), '2027-03-05');
+  assert.equal(rules.dueDate(' 60 months ', '2022-03-05'), '2027-03-31');
   assert.equal(rules.dueDate('pcs', '2026-01-01'), '');
   assert.equal(rules.dueDate('as required', '2026-01-01'), '');
   assert.equal(rules.dueDate('n/a', '2026-01-01'), '');
@@ -65,7 +70,7 @@ test('due dates: number labels work for intervals not seen before', () => {
   assert.equal(rules.dueDate('36 Months', '2025-01-31'), '2028-01-31');
   assert.equal(rules.dueDate('1 Year', '2026-09-30'), '2027-09-30');
   assert.equal(rules.dueDate('1 Year', '2026-10-01'), '2028-09-30');
-  assert.equal(rules.dueDate('10 Days', '2026-12-25'), '2027-01-04');
+  assert.equal(rules.dueDate('10 Days', '2026-12-25'), '2027-01-31'); // 4 Jan, then month end
   assert.equal(rules.dueDate('7 Years', '2026-09-30'), '2033-09-30');
 });
 
@@ -289,10 +294,10 @@ test('Overdue: YES when Due Date is before today', () => {
   const event = { id: 'G1', name: 'g', type: 'ground', label: 'Monthly' };
   assert.equal(rules.summarizeEvent(event, [{ mission: '', date: '2026-08-15', id: 'G1' }], TODAY)['Overdue'], 'YES'); // due 2026-09-30
   assert.equal(rules.summarizeEvent(event, [{ mission: '', date: '2026-09-15', id: 'G1' }], TODAY)['Overdue'], '');    // due 2026-10-31
-  // Due today is not before today.
-  const days = { id: 'G1', name: 'g', type: 'ground', label: '5 Days' };
-  assert.equal(rules.summarizeEvent(days, [{ mission: '', date: '2026-09-30', id: 'G1' }], TODAY)['Overdue'], '');
-  assert.equal(rules.summarizeEvent(days, [{ mission: '', date: '2026-09-29', id: 'G1' }], TODAY)['Overdue'], 'YES');
+  // Due today is not before today: Monthly from 15 Sep is due 31 Oct.
+  const row = [{ mission: '', date: '2026-09-15', id: 'G1' }];
+  assert.equal(rules.summarizeEvent(event, row, '2026-10-31')['Overdue'], '');
+  assert.equal(rules.summarizeEvent(event, row, '2026-11-01')['Overdue'], 'YES');
 });
 
 test('Overdue: YES when the label produces due dates and the event was never logged', () => {
