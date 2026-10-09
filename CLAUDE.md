@@ -10,6 +10,8 @@ Personal KC-135 aircrew training tracker. A PWA on any device logs training even
 
 Ask the user before adding anything that is not in this file. Ideas that were discussed and not adopted are listed under "Parked" at the end; do not build them without asking.
 
+**Working rule (2026-10-09):** propose a solution and agree it with the user before building it. A pull request waits for the user's review; never merge one unasked.
+
 ## Milestones
 
 | # | Scope | Status |
@@ -24,7 +26,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 
 | Tab | Written by | Columns |
 |---|---|---|
-| `Training Log` | the app, and the user by hand | Training ID, Date, Mission Number |
+| `Training Log` | the app, and the user by hand | Training ID, Date, Mission Number, Due Date Override (hand-entered only) |
 | `Ground Training Config` | the user | Task ID, Task Name, Frequency |
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
 | `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Complete, Remaining Sim Credit |
@@ -35,11 +37,12 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 
 - One row per accomplishment. Three landings on one sortie are three rows.
 - **Mission Number** says what kind of row it is: blank = ground training, `SIM` (trimmed, any case) = simulator, anything else = aircraft.
+- **Due Date Override** is the one hand-only column. A date there is the expiration an official document states for that one accomplishment (a DD 2992, a waiver, an extension). It belongs to the row, not the event: when that row is the event's Last Accomplished, the summary uses it instead of the label's date; a newer accomplishment supersedes it like any other date. It never affects volume. The app never writes or reads it; the result reaches the app through the summary. The script adds the header to a log made before the column existed.
 - No other columns, ever: no row IDs, timestamps, names, counts or notes.
 - The log is the only record of accomplishments. The user may add, fix or delete rows by hand in the sheet, and that must just work.
 - A row whose Training ID is not in either config tab is kept and ignored. Training IDs are matched trimmed and case-insensitive.
 - A row whose Date cannot be read as a date is ignored.
-- The script writes the three headers if row 1 is empty and keeps the Mission Number column formatted as plain text.
+- The script writes the four headers if row 1 is empty, adds any missing header in the next free column, keeps the Mission Number column formatted as plain text, and formats a date column it adds as `yyyy-mm-dd`.
 - **Typing dates by hand:** anything Sheets recognizes as a date works (`2026-10-05`, `5 Oct 2026`); the column displays `yyyy-mm-dd` and the script reads the date value, not the text. Avoid all-numeric `05/10/2026`, which the US locale reads month-first. The app always sends `YYYY-MM-DD`.
 
 ### Log check
@@ -53,6 +56,8 @@ Every refresh checks the log and reports, never fixes, rows that need a human. O
 | Date blank or not readable as a date | `date is blank or not a date, row ignored` | No |
 | Date after today | `date is after today, row still counted` | Yes |
 | Mission Number starts with `SIM` but is not exactly `SIM` (`SIM1`, `Simulator`) | `Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row` | Yes, as aircraft |
+| Due Date Override not readable as a date | `Due Date Override is not a date, override ignored` | Yes, with the label's due date |
+| Due Date Override earlier than the row's Date | `Due Date Override is before the row's Date, override still used` | Yes |
 
 Rows with both a blank ID and a blank date are skipped silently. The report goes to two places: a toast in the sheet after a refresh (always after Apollo → Refresh, only when there are problems after an open or edit; the first five rows plus a count of the rest) and the `logCheck` list in the API payload, so the app's Status screen can show it. Nothing is written to any tab. Not caught: a plausible wrong date, a wrong but valid ID, and a duplicate row, which the spec treats as a second accomplishment.
 
@@ -89,12 +94,12 @@ Labels are matched trimmed and case-insensitive. Number labels are matched by pa
 | `N Years` | 30 Sep of (FY of Last Accomplished + N) |
 | `N Months` | Last day of the month N months after Last Accomplished |
 | `N Days` | Last day of the month containing Last Accomplished + N days |
-
-ARMS, the system SARM reads, computes every interval to the last day of the month. SARM due dates for `6 Months`, `24 Months`, `48 Months` and `365 Days` events confirmed this on 2026-10-09; the rows marked SARM in the table below are those dates. Medical items tracked in ASIMS (the flight physical) follow their own convention and are not RTM events; see Gotchas.
 | `PCS`, `As Required`, `N/A`, blank | No due date |
 | anything else | Due Date shows `CHECK LABEL` |
 
 A label "produces due dates" when it is in the first five rows of this table.
+
+ARMS, the system SARM reads, computes every interval to the last day of the month. SARM due dates for `6 Months`, `24 Months`, `48 Months` and `365 Days` events confirmed this on 2026-10-09; the rows marked SARM in the table below are those dates. A requirement whose expiration comes from another system or a document (the flight physical on a DD 2992, a waiver, an extension) is not given a label of its own: its date goes in the log's Due Date Override column.
 
 ### Required test cases for due dates
 
@@ -153,8 +158,8 @@ These are checked against the RTM. If the code disagrees with this table, the co
 | Column | Value |
 |---|---|
 | Last Accomplished | Latest date among the rows that count. Blank if none. |
-| Due Date | From the label table above. Blank if there is no Last Accomplished, except that `CHECK LABEL` shows whether or not the event has been logged, so a mistyped label is visible at once. |
-| Overdue | `YES` if Due Date is before today, or if the label produces due dates and the event has never been logged. Otherwise blank. Never `YES` for `CHECK LABEL`. |
+| Due Date | From the label table above, or the Due Date Override on the Last Accomplished row if it has one. Blank if there is no Last Accomplished, except that `CHECK LABEL` shows whether or not the event has been logged, so a mistyped label is visible at once; `CHECK LABEL` beats an override. |
+| Overdue | `YES` if Due Date is before today (whether the label or an override set it), or if the label produces due dates and the event has never been logged. Otherwise blank. Never `YES` for `CHECK LABEL`. |
 | Volume Required | The config value if it is a number above 0. Anything else (blank, `X`) means nothing to count: this column, Percent Complete and Remaining Sim Credit are blank, and Volume Accomplished shows the plain count of rows that count this FY. |
 | Volume Accomplished | Aircraft rows this FY + SIM rows this FY, with SIM rows capped at `floor(Volume Required × Percent Credit in Sim)`. |
 | Percent Complete | `min(1, Accomplished / Required)`, stored as a fraction (0.5) and shown as a percent (50%) by the column's number format. The API returns the fraction. It was Percent Remaining until 2026-10-08; the user chose "complete" and the test table below was converted (100 − remaining). |
@@ -220,7 +225,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
   - `flying` is `[{ id, name, currency, volumeRequired, percentCreditInSim }]` with `volumeRequired` a number or `null` and `percentCreditInSim` a fraction, so the app can hide 0% events in Sim without parsing.
   - `summary` is one object per summary row, keyed by the summary tab's column headers.
   - `logCheck` is `[{ row, mission, date, id, problem }]` from the log check above, empty when the log is clean. `row` is the sheet row number.
-- `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows, refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
+- `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows (Due Date Override left blank), refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
 - **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. Eight or more characters is enough; it guards a training log. The app stores the web app URL and token from its Settings screen. Never commit either.
 - **Retry safety without extra log columns:** the script keeps the last 50 `batchId` values in Script Properties under `APOLLO_BATCH_IDS`. A repeated `batchId` appends nothing and returns success. Appends and refreshes run under `LockService`.
 
@@ -263,7 +268,6 @@ Sharing Apollo is sending someone one link: the guide at `https://135crewdog.git
 - **Bump both version strings** (`sw.js` `VERSION`, `app.js` `APP_VERSION`) with every change under `app/`.
 - **No Google Sheets Tables anywhere in the workbook.** See "The workbook". Note for anyone touching the sheet through the Sheets API: `deleteTable` clears the Table's cells as well, so read the values first and write them back.
 - The summary tab is script-owned. Never put formulas or user data there.
-- **Non-RTM requirements** such as the flight physical (ASIMS) are not computed the ARMS way: SARM gave 2027-06-10 for an exam on 2026-03-13, which no interval label produces. Until a label kind exists for them, their due dates in Apollo are approximate.
 
 ## Deliberately not in the app
 
@@ -271,10 +275,12 @@ Do not add these. The user and their training office handle them.
 
 - A profile or settings tab in the workbook
 - Auto-credit: logging one event never credits another
-- Proration, waivers, deployment grace periods
+- Proration
 - The 6-month non-current / unqualified rule
 - The instructor 50% credit rule
 - CSV/XLSX export (the workbook is the export)
+
+Not rules, but handled by the Due Date Override column in the log: waivers, extensions, deployment grace periods, and any requirement whose expiration is stated on a form (the flight physical's DD 2992 gave 2027-06-10 for an exam on 2026-03-13, which no interval label produces).
 
 ## Parked
 

@@ -14,7 +14,8 @@ var TAB_GROUND = 'Ground Training Config';
 var TAB_FLYING = 'Flying Training Config';
 var TAB_SUMMARY = 'Individual Training Summary';
 
-var LOG_HEADERS = ['Training ID', 'Date', 'Mission Number'];
+var LOG_HEADERS = ['Training ID', 'Date', 'Mission Number', 'Due Date Override'];
+var LOG_DATE_FORMAT = 'yyyy-mm-dd';
 var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
@@ -320,18 +321,32 @@ function readFlying(ss) {
 }
 
 /** Write the log headers if row 1 is empty, and keep Mission Number as plain text. */
+/**
+ * Writes the log headers when row 1 is empty, and adds any header that is missing
+ * (a workbook made before a column existed) in the next free column of row 1, so an
+ * existing log picks up a new column on its next refresh with no hand edit.
+ */
 function ensureLogHeaders(sheet) {
   var lastCol = Math.max(sheet.getLastColumn(), LOG_HEADERS.length);
   var row1 = sheet.getLastRow() >= 1 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
-  var empty = true;
+  var present = {};
+  var used = 0;
   for (var i = 0; i < row1.length; i++) {
-    if (cellText(row1[i]) !== '') { empty = false; break; }
+    var text = cellText(row1[i]);
+    if (text !== '') { present[text] = true; used = i + 1; }
   }
-  if (empty) {
-    sheet.getRange(1, 1, 1, LOG_HEADERS.length).setValues([LOG_HEADERS]);
-    sheet.getRange(1, LOG_HEADERS.indexOf('Mission Number') + 1, sheet.getMaxRows(), 1).setNumberFormat('@');
-    sheet.setFrozenRows(1);
+  var added = false;
+  for (var h = 0; h < LOG_HEADERS.length; h++) {
+    var header = LOG_HEADERS[h];
+    if (present[header]) continue;
+    var col = used + 1;
+    sheet.getRange(1, col).setValue(header);
+    if (header === 'Mission Number') sheet.getRange(1, col, sheet.getMaxRows(), 1).setNumberFormat('@');
+    if (header === 'Date' || header === 'Due Date Override') sheet.getRange(2, col, sheet.getMaxRows() - 1, 1).setNumberFormat(LOG_DATE_FORMAT);
+    used = col;
+    added = true;
   }
+  if (added) sheet.setFrozenRows(1);
 }
 
 function readLog(ss) {
@@ -348,7 +363,8 @@ function readLog(ss) {
       row: i + 2,
       mission: cellText(r[t.col['Mission Number']]),
       date: date,
-      id: id
+      id: id,
+      dueOverride: cellDate(ss, r[t.col['Due Date Override']])
     });
   }
   return out;

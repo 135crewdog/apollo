@@ -374,6 +374,74 @@ test('buildSummary: numeric Task IDs match numeric log IDs', () => {
 // Log check
 // ---------------------------------------------------------------------------
 
+test('Due Date Override: the override on the Last Accomplished row replaces the computed due date', () => {
+  const fltmed = { id: 'FLTMED', name: 'Flight Physical', type: 'ground', label: '455 Days' };
+  const rows = [{ mission: '', date: '2026-03-13', id: 'FLTMED', dueOverride: '2027-06-10' }];
+  const row = rules.summarizeEvent(fltmed, rows, TODAY);
+  assert.equal(row['Last Accomplished'], '2026-03-13');
+  assert.equal(row['Due Date'], '2027-06-10'); // the DD 2992 date, not 2027-06-30
+  assert.equal(row['Overdue'], '');
+  // No override: the label computes it.
+  assert.equal(rules.summarizeEvent(fltmed, [{ mission: '', date: '2026-03-13', id: 'FLTMED' }], TODAY)['Due Date'], '2027-06-30');
+});
+
+test('Due Date Override: last row only, a newer accomplishment supersedes an older override', () => {
+  const event = { id: 'G1', name: 'g', type: 'ground', label: 'Annual' };
+  const rows = [
+    { mission: '', date: '2025-03-01', id: 'G1', dueOverride: '2029-12-31' },
+    { mission: '', date: '2026-03-01', id: 'G1' },
+  ];
+  assert.equal(rules.summarizeEvent(event, rows, TODAY)['Due Date'], '2027-09-30');
+  // Order in the log does not matter; the latest date wins.
+  assert.equal(rules.summarizeEvent(event, rows.slice().reverse(), TODAY)['Due Date'], '2027-09-30');
+  // Several rows on the latest date: an override on any of them applies.
+  const sameDay = [
+    { mission: '1234', date: '2026-03-01', id: 'G1' },
+    { mission: '1234', date: '2026-03-01', id: 'G1', dueOverride: '2026-12-31' },
+    { mission: '1234', date: '2026-03-01', id: 'G1' },
+  ];
+  assert.equal(rules.summarizeEvent(event, sameDay, TODAY)['Due Date'], '2026-12-31');
+});
+
+test('Due Date Override: an overridden date in the past is overdue, even for a label with no due dates', () => {
+  const pcs = { id: 'G1', name: 'g', type: 'ground', label: 'PCS' };
+  const rows = [{ mission: '', date: '2024-01-10', id: 'G1', dueOverride: '2026-09-30' }];
+  const row = rules.summarizeEvent(pcs, rows, TODAY);
+  assert.equal(row['Due Date'], '2026-09-30');
+  assert.equal(row['Overdue'], 'YES');
+  // Never logged under PCS is still not overdue.
+  assert.equal(rules.summarizeEvent(pcs, [], TODAY)['Overdue'], '');
+});
+
+test('Due Date Override: CHECK LABEL still wins, an unreadable override is ignored, volume is untouched', () => {
+  const bad = { id: 'G1', name: 'g', type: 'ground', label: 'Fortnightly' };
+  assert.equal(rules.summarizeEvent(bad, [{ mission: '', date: '2026-01-01', id: 'G1', dueOverride: '2027-01-01' }], TODAY)['Due Date'], rules.CHECK_LABEL);
+  const monthly = { id: 'G1', name: 'g', type: 'ground', label: 'Monthly' };
+  assert.equal(rules.summarizeEvent(monthly, [{ mission: '', date: '2026-09-01', id: 'G1', dueOverride: 'soon' }], TODAY)['Due Date'], '2026-10-31');
+  const rows = rowsThisFy(1, 1);
+  rows[1].dueOverride = '2027-12-31';
+  const row = rules.summarizeEvent(flyingEvent(4, 0.5), rows, TODAY);
+  assert.equal(row['Due Date'], '2027-12-31');
+  assert.equal(row['Volume Accomplished'], 2);
+  assert.equal(row['Remaining Sim Credit'], 1);
+});
+
+test('checkLog: Due Date Override problems come after the row problems', () => {
+  const ground = [{ id: 'G1', name: 'g', label: 'Annual' }];
+  const log = [
+    { row: 2, mission: '', date: '2026-03-13', id: 'G1', dueOverride: '2027-06-10' },
+    { row: 3, mission: '', date: '2026-03-13', id: 'G1', dueOverride: 'June' },
+    { row: 4, mission: '', date: '2026-03-13', id: 'G1', dueOverride: '2026-03-12' },
+    { row: 5, mission: '', date: '2026-03-13', id: 'G1', dueOverride: '2026-03-13' },
+    { row: 6, mission: '', date: 'bad', id: 'G1', dueOverride: 'June' },
+  ];
+  assert.deepEqual(rules.checkLog(log, ground, [], TODAY).map((p) => [p.row, p.problem]), [
+    [3, 'Due Date Override is not a date, override ignored'],
+    [4, "Due Date Override is before the row's Date, override still used"],
+    [6, 'date is blank or not a date, row ignored'],
+  ]);
+});
+
 test('checkLog: reports ignored and suspect rows with the sheet row number, worst problem first', () => {
   const ground = [{ id: 'GD27YM', name: 'CRM', label: 'Annual' }];
   const flying = [{ id: 'AL01YM', name: 'Landing', label: 'Monthly', volumeRequired: 12, percentCreditInSim: 1 }];
