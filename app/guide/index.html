@@ -139,7 +139,7 @@
   <h3>Status</h3>
   <p>Your events, overdue first, then by due date. The badge color is the same as in the sheet: gray is overdue, red is due within 30 days, orange within 60, yellow within 90. Under each event: when you last did it, and for volume events how many of the year's requirement you have so far.</p>
   <details><summary>More</summary>
-    <p>Due dates come from the label on your config tab, read the way the RTM reads them. Monthly, Quarterly and Semi-Annual events are due at the end of the period after the one you last did them in, with quarters and halves aligned to the fiscal year. Annual, Biennial and Triennial events are due on 30 September one, two or three fiscal years on. "N Months" and "N Days" count from the date itself. PCS, As Required and N/A have no due date and never show overdue.</p>
+    <p>Due dates come from the label on your config tab, read the way the RTM reads them. Monthly, Quarterly and Semi-Annual events are due at the end of the period after the one you last did them in, with quarters and halves aligned to the fiscal year. Annual, Biennial and Triennial events are due on 30 September one, two or three fiscal years on. "N Months" and "N Days" land on the last day of the month they count to, which is how ARMS counts them. PCS, As Required and N/A have no due date and never show overdue.</p>
     <p>Volume counts only this fiscal year, 1 October to 30 September. Sim rows count toward volume up to the event's sim-credit percentage of the requirement; "sim credit available" is how many more sim accomplishments can still count. An event is marked overdue when its due date has passed or when it has never been logged at all.</p>
   </details>
   <h3>Settings</h3>
@@ -157,6 +157,7 @@
     <p>Your ITS gives you the last date and this year's count per event. A quick way through it: for each event, type the last date once; then, for events with a count above one this year, copy that row until the count matches. Afterwards run Apollo → Refresh and compare the summary with the ITS. The Overdue column should agree with it, and each volume event's "Volume Accomplished" should match the ITS count.</p>
   </details>
   <h3>The sheet is the record</h3>
+  <p>Some requirements get their expiration from a form rather than a rule: the flight physical's DD 2992, a waiver, an extension. Put that date in the <b>Due Date Override</b> column of the same row, and the summary uses it instead of the label's date for as long as that row is the latest one. The app shows it on its next sync; nothing is typed in the app.</p>
   <p>You can add, fix or delete rows in the Training Log by hand at any time. The summary recalculates whenever the sheet is edited, opened, or synced. Type dates any way Sheets recognizes, such as <code>2026-10-05</code> or <code>5 Oct 2026</code>; the column shows them as yyyy-mm-dd. Avoid all-numeric dates like 05/10/2026, which the sheet reads month-first.</p>
   <h3>The log check</h3>
   <p>After every refresh the sheet checks the log and shows a small message if a row needs attention: a Training ID that is not in either config tab, a date it cannot read, a date in the future, or a mission number that looks like <code>SIM</code> but is not exactly <code>SIM</code>. The same list appears on the app's Status screen. The check reports; it never changes your rows.</p>

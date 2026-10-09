@@ -258,6 +258,7 @@ function summarizeEvent(event, rows, today) {
   var thisFy = todayYmd ? fiscalYear(todayYmd) : null;
 
   var last = '';
+  var lastOverride = '';  // Due Date Override on the row that is Last Accomplished
   var aircraftThisFy = 0;
   var simThisFy = 0;
 
@@ -278,19 +279,28 @@ function summarizeEvent(event, rows, today) {
     }
     if (!counts) continue;
     var dateStr = formatDate(date);
-    if (dateStr > last) last = dateStr;
+    var override = parseDate(rows[i].dueOverride);
+    if (dateStr > last) {
+      last = dateStr;
+      lastOverride = override ? formatDate(override) : '';
+    } else if (dateStr === last && override) {
+      lastOverride = formatDate(override);
+    }
     if (bucket && thisFy !== null && fiscalYear(date) === thisFy) {
       if (bucket === 'sim') simThisFy++;
       else aircraftThisFy++;
     }
   }
 
+  // The label computes the due date, unless the Last Accomplished row carries a
+  // Due Date Override: the expiration an official document states for that one
+  // accomplishment. A newer accomplishment supersedes it like any other date.
+  // CHECK LABEL still wins, so a mistyped label stays visible.
   var due = last ? dueDate(event.label, last) : (classifyLabel(event.label).kind === 'unknown' ? CHECK_LABEL : '');
+  if (last && lastOverride && due !== CHECK_LABEL) due = lastOverride;
   var overdue = '';
-  if (labelProducesDueDates(event.label)) {
-    if (!last) overdue = 'YES';
-    else if (due && due !== CHECK_LABEL && today && due < today) overdue = 'YES';
-  }
+  if (!last && labelProducesDueDates(event.label)) overdue = 'YES';
+  else if (due && due !== CHECK_LABEL && today && due < today) overdue = 'YES';
 
   var row = {
     'Task ID': event.id == null ? '' : event.id,
@@ -351,7 +361,8 @@ function buildSummary(ground, flying, log, today) {
  * ground, flying: the config rows
  * today:  'YYYY-MM-DD'
  *
- * Returns [{ row, mission, date, id, problem }], one problem per row, worst first:
+ * Returns [{ row, mission, date, id, problem }], one problem per row, worst first
+ * (log rows may carry dueOverride, the Due Date Override cell):
  * a blank or unknown Training ID or an unreadable date means the row was ignored;
  * a future date or a SIM-looking Mission Number means the row was counted but is suspect.
  */
@@ -365,12 +376,16 @@ function checkLog(log, ground, flying, today) {
     var id = normalizeId(entry.id);
     var date = parseDate(entry.date);
     var mission = String(entry.mission == null ? '' : entry.mission).trim();
+    var overrideText = String(entry.dueOverride == null ? '' : entry.dueOverride).trim();
+    var override = parseDate(overrideText);
     var problem = '';
     if (id === '') problem = 'blank Training ID, row ignored';
     else if (!known[id]) problem = 'Training ID not in either config tab, row ignored';
     else if (!date) problem = 'date is blank or not a date, row ignored';
     else if (today && formatDate(date) > today) problem = 'date is after today, row still counted';
     else if (rowKind(mission) === 'aircraft' && /^sim/i.test(mission)) problem = 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row';
+    else if (overrideText !== '' && !override) problem = 'Due Date Override is not a date, override ignored';
+    else if (override && formatDate(override) < formatDate(date)) problem = 'Due Date Override is before the row\'s Date, override still used';
     if (problem) out.push({ row: entry.row, mission: entry.mission, date: entry.date, id: entry.id, problem: problem });
   }
   return out;
