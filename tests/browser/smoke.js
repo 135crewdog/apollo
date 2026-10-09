@@ -166,10 +166,10 @@ async function main() {
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
     await context.setOffline(true);
     await page.reload();
-    await page.waitForSelector('#summary .item');
+    await page.waitForSelector('#events .event');
     const appVersion = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'app.js'), 'utf8').match(/APP_VERSION = '([^']+)'/)[1];
     assert.equal(await page.textContent('#version'), appVersion, 'script loaded from cache offline');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app')).maxWidth), '430px', 'styles loaded from cache offline');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app')).maxWidth), '720px', 'styles loaded from cache offline');
     await context.setOffline(false);
 
     // The handoff link: a fresh device opens the app URL with the connection in the fragment.

@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.09.3';
+var APP_VERSION = '2026.10.09.4';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -253,16 +253,14 @@ if (typeof document !== 'undefined') {
         b.classList.toggle('on', on);
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
-      $('track').style.transform = 'translateX(-' + (TABS.indexOf(ui.tab) * 100) + '%)';
-      $('savebar').classList.toggle('hidden', ui.tab !== 'log');
+      TABS.forEach(function (t) { $('screen-' + t).classList.toggle('hidden', t !== ui.tab); });
     }
 
     function changeTab(name) {
       if (TABS.indexOf(name) === -1 || name === ui.tab) return;
       ui.tab = name;
       renderTabs();
-      var panel = $('screen-' + name);
-      setTimeout(function () { panel.scrollTop = 0; }, 100);
+      window.scrollTo(0, 0);
     }
 
     function pendingText() {
@@ -501,7 +499,8 @@ if (typeof document !== 'undefined') {
       if (b) changeTab(b.dataset.tab);
     });
 
-    // Swipe between Log and Status, as in Show Time: horizontal movement must dominate.
+    // Swipe between Log and Status: horizontal movement must dominate. The switch is
+    // immediate; the page is not a sliding track.
     var touch = { x: null, y: null, ex: null, ey: null };
     var panels = $('panels');
     panels.addEventListener('touchstart', function (e) {
