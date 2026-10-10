@@ -55,10 +55,10 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-button, input:not([type="checkbox"]), select { -webkit-appearance: none; appearance: none; font-family: inherit; }
+/* Search fields keep the browser's own look: iPhone draws its clear button only inside it. */
+button, input:not([type="checkbox"]):not([type="search"]), select { -webkit-appearance: none; appearance: none; }
+button, input, select { font-family: inherit; }
 input[type="checkbox"] { -webkit-appearance: checkbox; appearance: checkbox; }
-/* The browser's own clear button on a search field; the reset above would hide it. */
-input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: searchfield-cancel-button; }
 button, input, select { touch-action: manipulation; }
 
 /* One reading width for the whole project, the same as the guide's. A phone fills it; a
