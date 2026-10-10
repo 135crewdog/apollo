@@ -19,10 +19,15 @@ var LOG_DATE_FORMAT = 'yyyy-mm-dd';
 var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
+/** Bump on every change to Code.js or rules.js. Returned in the API payload and shown in the app's Settings. */
+var SCRIPT_VERSION = '2026.10.10.2';
+
 var APP_URL = 'https://135crewdog.github.io/apollo/';
 var PROP_TOKEN = 'APOLLO_TOKEN';
 var PROP_BATCH_IDS = 'APOLLO_BATCH_IDS';
 var BATCH_IDS_KEPT = 50;
+var BATCH_ID_MAX_LENGTH = 100;
+var BATCH_ROWS_MAX = 500;
 var LOCK_WAIT_MS = 30000;
 
 // ---------------------------------------------------------------------------
@@ -47,7 +52,7 @@ function onEdit(e) {
 function refresh() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
-    var result = refreshSummary(ss);
+    var result = withLock(function () { return refreshSummary(ss); });
     ss.toast(describeLogCheck(result.logCheck, result.log.length), 'Apollo', 15);
   } catch (err) {
     ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
@@ -58,10 +63,26 @@ function refresh() {
 function safeRefresh() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
-    var result = refreshSummary(ss);
+    var result = withLock(function () { return refreshSummary(ss); });
     if (result.logCheck.length) ss.toast(describeLogCheck(result.logCheck, result.log.length), 'Apollo', 15);
   } catch (err) {
     ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
+  }
+}
+
+/**
+ * Every path that reads the tabs and writes the summary or the log runs under the one
+ * script lock, so a trigger refresh, a menu refresh and an app save never interleave.
+ * Pending writes are flushed before the lock is released, so the next holder reads them.
+ */
+function withLock(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(LOCK_WAIT_MS);
+  try {
+    return fn();
+  } finally {
+    SpreadsheetApp.flush();
+    lock.releaseLock();
   }
 }
 
@@ -165,14 +186,11 @@ function writeSummary(ss, rows) {
   for (var i = 0; i < rows.length; i++) values.push(summaryRowToArray(rows[i]));
 
   var sheet = ss.getSheetByName(TAB_SUMMARY) || ss.insertSheet(TAB_SUMMARY);
-  try {
-    fillSummary(sheet, values);
-    if (String(sheet.getRange(1, 1).getValue()) === SUMMARY_HEADERS[0]) return;
-  } catch (err) {
-    // fall through and rebuild the tab
-  }
-  // Something done by hand to the script-owned tab (for example Format > Convert
-  // to table, which takes over the header row) stopped the write. Rebuild the tab.
+  fillSummary(sheet, values);
+  if (String(sheet.getRange(1, 1).getValue()) === SUMMARY_HEADERS[0]) return;
+  // The header did not land: a Google Sheets Table (Format > Convert to table) owns row 1
+  // of the script-owned tab. Rebuild the tab. Any other failure above is an error and
+  // the tab stays as it is.
   var index = sheet.getIndex();
   ss.deleteSheet(sheet);
   sheet = ss.insertSheet(TAB_SUMMARY, index - 1);
@@ -182,15 +200,35 @@ function writeSummary(ss, rows) {
 /**
  * A refresh clears and rewrites the values. The text and percent formats, the frozen
  * header and the Due Date colors are set once, on whole columns, and survive every
- * refresh; a tab whose last row is not yet text-formatted has not had that done.
+ * refresh. A tab whose color rules do not reach its last row (never formatted, formatted
+ * when it was shorter, or grown since) is formatted again, once.
  */
 function fillSummary(sheet, values) {
-  if (sheet.getRange(sheet.getMaxRows(), 1).getNumberFormat() !== '@') formatSummary(sheet);
+  ensureRows(sheet, values.length);
+  if (!colorRulesReachLastRow(sheet)) formatSummary(sheet);
   // A filter or sort left on this tab by hand reorders rows under the next write.
   var filter = sheet.getFilter();
   if (filter) filter.remove();
   sheet.clearContents();
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
+}
+
+function colorRulesReachLastRow(sheet) {
+  var rules = sheet.getConditionalFormatRules();
+  if (rules.length !== DUE_BANDS.length) return false;
+  var ranges = rules[0].getRanges();
+  return ranges.length > 0 && ranges[0].getLastRow() >= sheet.getMaxRows();
+}
+
+/** A write past the grid fails, so the grid grows first. */
+function ensureRows(sheet, rows) {
+  var max = sheet.getMaxRows();
+  if (rows > max) sheet.insertRowsAfter(max, rows - max);
+}
+
+function ensureColumns(sheet, columns) {
+  var max = sheet.getMaxColumns();
+  if (columns > max) sheet.insertColumnsAfter(max, columns - max);
 }
 
 function formatSummary(sheet) {
@@ -246,8 +284,29 @@ function getSheet(ss, name) {
 }
 
 /**
- * Read a tab with a header row. Columns are found by exact header text
- * (trimmed) in row 1, never by position.
+ * Columns by exact header text (trimmed) in row 1, never by position: { header: index }.
+ * The one parser for reading and for appending, so both see the same column. A required
+ * header that appears twice is an error naming the columns, since a read and a write
+ * could otherwise disagree about which one is meant.
+ */
+function headerColumns(name, row1, requiredHeaders) {
+  var col = {};
+  var twice = {};
+  for (var i = 0; i < row1.length; i++) {
+    var text = cellText(row1[i]);
+    if (text === '') continue;
+    if (text in col) twice[text] = (twice[text] || [columnLetter(col[text] + 1)]).concat(columnLetter(i + 1));
+    else col[text] = i;
+  }
+  for (var j = 0; j < requiredHeaders.length; j++) {
+    var h = requiredHeaders[j];
+    if (twice[h]) throw new Error('Tab "' + name + '" has the column "' + h + '" more than once (' + twice[h].join(', ') + ')');
+  }
+  return col;
+}
+
+/**
+ * Read a tab with a header row.
  * Returns { col: { header: index }, rows: [[...]] } with rows below the header.
  */
 function readTable(sheet, requiredHeaders) {
@@ -255,12 +314,7 @@ function readTable(sheet, requiredHeaders) {
   // would each be another round trip to Sheets.
   var values = sheet.getDataRange().getValues();
   if (!values.length || !values[0].length) throw new Error('Tab "' + sheet.getName() + '" has no header row');
-  var header = values[0];
-  var col = {};
-  for (var i = 0; i < header.length; i++) {
-    var text = String(header[i]).trim();
-    if (text && !(text in col)) col[text] = i;
-  }
+  var col = headerColumns(sheet.getName(), values[0], requiredHeaders);
   for (var j = 0; j < requiredHeaders.length; j++) {
     if (!(requiredHeaders[j] in col)) {
       throw new Error('Tab "' + sheet.getName() + '" is missing the column "' + requiredHeaders[j] + '"');
@@ -278,10 +332,10 @@ function cellText(v) {
  * as midnight in the spreadsheet's time zone, so formatting it in that same zone
  * gives back exactly the date that was typed, whatever the zone is set to.
  */
-function cellDate(ss, v) {
+function cellDate(v, timeZone) {
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return '';
-    return Utilities.formatDate(v, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+    return Utilities.formatDate(v, timeZone, 'yyyy-MM-dd');
   }
   return cellText(v);
 }
@@ -327,17 +381,17 @@ function readFlying(ss) {
  * next refresh with no hand edit.
  */
 function ensureLogHeaders(sheet) {
-  var row1 = sheet.getRange(1, 1, 1, Math.max(sheet.getMaxColumns(), LOG_HEADERS.length)).getValues()[0];
-  var col = {};
+  var row1 = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues()[0];
+  var col = headerColumns(sheet.getName(), row1, LOG_HEADERS);
   var used = 0;
   for (var i = 0; i < row1.length; i++) {
-    var text = cellText(row1[i]);
-    if (text !== '') { col[text] = i; used = i + 1; }
+    if (cellText(row1[i]) !== '') used = i + 1;
   }
   var added = false;
   for (var h = 0; h < LOG_HEADERS.length; h++) {
     var header = LOG_HEADERS[h];
     if (header in col) continue;
+    ensureColumns(sheet, used + 1);
     sheet.getRange(1, used + 1).setValue(header);
     if (header === 'Mission Number') sheet.getRange(1, used + 1, sheet.getMaxRows(), 1).setNumberFormat('@');
     if (header === 'Date' || header === 'Due Date Override') sheet.getRange(2, used + 1, sheet.getMaxRows() - 1, 1).setNumberFormat(LOG_DATE_FORMAT);
@@ -353,18 +407,19 @@ function readLog(ss) {
   var sheet = getSheet(ss, TAB_LOG);
   ensureLogHeaders(sheet);
   var t = readTable(sheet, LOG_HEADERS);
+  var timeZone = ss.getSpreadsheetTimeZone();
   var out = [];
   for (var i = 0; i < t.rows.length; i++) {
     var r = t.rows[i];
     var id = cellText(r[t.col['Training ID']]);
-    var date = cellDate(ss, r[t.col['Date']]);
+    var date = cellDate(r[t.col['Date']], timeZone);
     if (id === '' && date === '') continue;
     out.push({
       row: i + 2,
       mission: cellText(r[t.col['Mission Number']]),
       date: date,
       id: id,
-      dueOverride: cellDate(ss, r[t.col['Due Date Override']])
+      dueOverride: cellDate(r[t.col['Due Date Override']], timeZone)
     });
   }
   return out;
@@ -390,6 +445,7 @@ function appendLogRows(ss, rows) {
     return line;
   });
   var start = sheet.getLastRow() + 1;
+  ensureRows(sheet, start + rows.length - 1);
   // Mission Number stays plain text so '0123' and '1E5' are not altered by Sheets.
   sheet.getRange(start, col['Mission Number'] + 1, rows.length, 1).setNumberFormat('@');
   sheet.getRange(start, 1, rows.length, width).setValues(values);
@@ -397,14 +453,18 @@ function appendLogRows(ss, rows) {
 
 function validateRows(rows) {
   if (!Array.isArray(rows)) throw new Error('rows must be an array');
+  if (rows.length > BATCH_ROWS_MAX) throw new Error('A batch holds at most ' + BATCH_ROWS_MAX + ' rows');
   var out = [];
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i] || {};
     var date = cellText(r.date);
     var id = cellText(r.id);
+    var mission = cellText(r.mission);
     if (!parseDate(date)) throw new Error('Row ' + (i + 1) + ': date must be YYYY-MM-DD');
     if (id === '') throw new Error('Row ' + (i + 1) + ': id is required');
-    out.push({ mission: cellText(r.mission), date: date, id: id });
+    // A leading = would be a formula to Sheets; the log holds values only.
+    if (id.charAt(0) === '=' || mission.charAt(0) === '=') throw new Error('Row ' + (i + 1) + ': a value cannot start with =');
+    out.push({ mission: mission, date: date, id: id });
   }
   return out;
 }
@@ -417,15 +477,9 @@ function doGet(e) {
   return respond(function () {
     checkToken(e && e.parameter ? e.parameter.token : '');
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var lock = LockService.getScriptLock();
-    lock.waitLock(LOCK_WAIT_MS);
-    try {
-      // A sync reads; it does not rewrite the summary tab. The tab refreshes on open,
-      // on edit, on every POST and from the menu.
-      return buildPayload(computeSummary(ss));
-    } finally {
-      lock.releaseLock();
-    }
+    // A sync reads; it does not rewrite the summary tab. The tab refreshes on open,
+    // on edit, on every POST and from the menu.
+    return withLock(function () { return buildPayload(computeSummary(ss)); });
   });
 }
 
@@ -435,20 +489,19 @@ function doPost(e) {
     checkToken(body.token);
     var batchId = cellText(body.batchId);
     if (batchId === '') throw new Error('batchId is required');
+    if (batchId.length > BATCH_ID_MAX_LENGTH) throw new Error('batchId is too long');
     var rows = validateRows(body.rows || []);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var lock = LockService.getScriptLock();
-    lock.waitLock(LOCK_WAIT_MS);
-    try {
+    return withLock(function () {
       var known = readBatchIds();
       if (known.indexOf(batchId) === -1) {
         appendLogRows(ss, rows);
+        // The rows are in the sheet before the receipt says so.
+        SpreadsheetApp.flush();
         rememberBatch(known, batchId);
       }
       return buildPayload(refreshSummary(ss));
-    } finally {
-      lock.releaseLock();
-    }
+    });
   });
 }
 
@@ -456,6 +509,7 @@ function doPost(e) {
 function buildPayload(result) {
   return {
     ok: true,
+    version: SCRIPT_VERSION,
     asOf: result.day,
     ground: result.ground.map(function (g) {
       return { id: cellText(g.id), name: cellText(g.name), frequency: cellText(g.label) };
@@ -496,14 +550,18 @@ function checkToken(token) {
   if (cellText(token) !== expected) throw new Error('Bad token');
 }
 
+/** The receipts of the last batches. A receipt list that cannot be read must not become an empty one, or a retry appends twice. */
 function readBatchIds() {
   var raw = PropertiesService.getScriptProperties().getProperty(PROP_BATCH_IDS);
+  if (!raw) return [];
+  var ids;
   try {
-    var ids = raw ? JSON.parse(raw) : [];
-    return Array.isArray(ids) ? ids : [];
+    ids = JSON.parse(raw);
   } catch (err) {
-    return [];
+    ids = null;
   }
+  if (!Array.isArray(ids)) throw new Error(PROP_BATCH_IDS + ' in Script Properties is not a JSON list; fix or delete it');
+  return ids;
 }
 
 function rememberBatch(ids, batchId) {

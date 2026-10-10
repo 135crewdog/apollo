@@ -37,7 +37,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 
 - One row per accomplishment. Three landings on one sortie are three rows.
 - **Mission Number** says what kind of row it is: blank = ground training, `SIM` (trimmed, any case) = simulator, anything else = aircraft.
-- **Due Date Override** is the one hand-only column. A date there is the expiration an official document states for that one accomplishment (a DD 2992, a waiver, an extension). It belongs to the row, not the event: when that row is the event's Last Accomplished, the summary uses it instead of the label's date; a newer accomplishment supersedes it like any other date. It never affects volume. The app never writes or reads it; the result reaches the app through the summary. The script adds the header to a log made before the column existed.
+- **Due Date Override** is the one hand-only column. A date there is the expiration an official document states for that one accomplishment (a DD 2992, a waiver, an extension). It belongs to the row, not the event: when that row is the event's Last Accomplished, the summary uses it instead of the label's date; a newer accomplishment supersedes it like any other date. If two rows of one event on the same date carry different overrides, the earliest wins, whatever their order in the log, and the log check reports the other. It never affects volume. The app never writes or reads it; the result reaches the app through the summary. The script adds the header to a log made before the column existed.
 - No other columns, ever: no row IDs, timestamps, names, counts or notes.
 - The log is the only record of accomplishments. The user may add, fix or delete rows by hand in the sheet, and that must just work.
 - A row whose Training ID is not in either config tab is kept and ignored. Training IDs are matched trimmed and case-insensitive.
@@ -57,6 +57,7 @@ Every refresh checks the log and reports, never fixes, rows that need a human. O
 | Date after today | `date is after today, row still counted` | Yes |
 | Mission Number starts with `SIM` but is not exactly `SIM` (`SIM1`, `Simulator`) | `Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row` | Yes, as aircraft |
 | Due Date Override not readable as a date | `Due Date Override is not a date, override ignored` | Yes, with the label's due date |
+| Due Date Override later than another on the same event and date | `another row on the same Date has an earlier Due Date Override, this one ignored` | Yes, with the earlier override |
 | Due Date Override earlier than the row's Date | `Due Date Override is before the row's Date, override still used` | Yes |
 
 Rows with both a blank ID and a blank date are skipped silently. The report goes to two places: a toast in the sheet after a refresh (always after Apollo → Refresh, only when there are problems after an open or edit; the first five rows plus a count of the rest) and the `logCheck` list in the API payload, so the app's Status screen can show it. Nothing is written to any tab. Not caught: a plausible wrong date, a wrong but valid ID, and a duplicate row, which the spec treats as a second accomplishment.
@@ -95,7 +96,7 @@ Labels are matched trimmed and case-insensitive. Number labels are matched by pa
 | `N Months` | Last day of the month N months after Last Accomplished |
 | `N Days` | Last day of the month containing Last Accomplished + N days |
 | `PCS`, `As Required`, `N/A`, blank | No due date |
-| anything else | Due Date shows `CHECK LABEL` |
+| anything else, or an interval beyond 100 years (`101 Years`, `1201 Months`, `36501 Days`) | Due Date shows `CHECK LABEL` |
 
 A label "produces due dates" when it is in the first five rows of this table.
 
@@ -211,23 +212,24 @@ tests/browser/            smoke.js drives the app in Chromium against mock-api.j
 ```
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
-- **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code.
-- **Refresh** rewrites the Individual Training Summary and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every POST, and from a custom menu (Apollo → Refresh). A GET computes the same payload without writing the sheet, so a sync does not wait on a write. A failure inside a trigger shows as a toast in the sheet rather than failing silently. Each input tab is read in one call per refresh and nothing is read twice.
+- **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, bump `SCRIPT_VERSION` in `Code.js`, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code. The payload carries the version and the app shows it under its own in Settings, so a stale deployment is visible.
+- **Refresh** rewrites the Individual Training Summary and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every POST, and from a custom menu (Apollo → Refresh). A GET computes the same payload without writing the sheet, so a sync does not wait on a write. A failure inside a trigger shows as a toast in the sheet rather than failing silently, and leaves the summary tab as it was; the one case that rebuilds the tab is a Google Sheets Table owning its header row. Each input tab is read in one call per refresh and nothing is read twice. Every path that reads the tabs and writes the summary or the log (open, edit, menu, GET, POST) runs under the one script lock and flushes its writes before releasing it. Columns are found by the first cell in row 1 with the header's text; a required header that appears twice stops the refresh with the column letters. The grid grows before a write would run past it.
 - **The app is offline-first.** A log entry goes into a local queue at once and syncs when there is a connection. Config, summary and queue are kept in `localStorage`.
 
 ### Web app API
 
 Every response is JSON. Apps Script cannot set HTTP status codes, so errors come back as `{ "ok": false, "error": "..." }`.
 
-- `GET ?token=…` computes the summary (without writing the sheet) and returns `{ ok, asOf, ground, flying, summary, logCheck }`.
+- `GET ?token=…` computes the summary (without writing the sheet) and returns `{ ok, version, asOf, ground, flying, summary, logCheck }`.
+  - `version` is the script's `SCRIPT_VERSION`.
   - `asOf` is today's UTC date.
   - `ground` is `[{ id, name, frequency }]`.
   - `flying` is `[{ id, name, currency, volumeRequired, percentCreditInSim }]` with `volumeRequired` a number or `null` and `percentCreditInSim` a fraction, so the app can hide 0% events in Sim without parsing.
   - `summary` is one object per summary row, keyed by the summary tab's column headers, plus `band`: `overdue`, `d30`, `d60`, `d90` or `''` from the Due Date colors table, computed for `asOf`.
   - `logCheck` is `[{ row, mission, date, id, problem }]` from the log check above, empty when the log is clean. `row` is the sheet row number.
-- `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows (Due Date Override left blank), refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
+- `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows (Due Date Override left blank), refreshes, and returns the same payload as GET. `batchId` is required and at most 100 characters; a batch holds at most 500 rows. Every `date` must be `YYYY-MM-DD`, every `id` non-empty, and no `id` or `mission` may start with `=`, or the whole batch is rejected and nothing is appended.
 - **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. Eight or more characters is enough; it guards a training log. The app stores the web app URL and token from its Settings screen. Never commit either.
-- **Retry safety without extra log columns:** the script keeps the last 50 `batchId` values in Script Properties under `APOLLO_BATCH_IDS`. A repeated `batchId` appends nothing and returns success. Appends and refreshes run under `LockService`.
+- **Retry safety without extra log columns:** the script keeps the last 50 `batchId` values in Script Properties under `APOLLO_BATCH_IDS`. A repeated `batchId` appends nothing and returns success. The append is flushed before its receipt is written. A receipt list that cannot be read fails the save with a message naming the property rather than becoming empty and appending twice.
 
 ### The app (three screens)
 
@@ -262,7 +264,7 @@ Sharing Apollo is sending someone one link: the guide at `https://135crewdog.git
 - **Dates are `YYYY-MM-DD` strings everywhere outside the sheet.** Do date math on year/month/day numbers, never on local-time `Date` objects.
 - **Today is `Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd')` in the script and `new Date().toISOString().slice(0, 10)` in the app.** Never `getDate()`, `getMonth()` or a date picker's local default.
 - **Reading a date cell:** a date cell is a calendar date, stored by Sheets as midnight in the spreadsheet's time zone, so convert it with `Utilities.formatDate(d, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')` to get back exactly the date that was typed. Formatting it in UTC would shift it a day whenever the spreadsheet's zone is not UTC. The workbook's time zone is set to UTC anyway (File → Settings → Time zone), and the milestone 3 template ships that way.
-- **Percent Credit in Sim** may arrive as a number (`0.5`) or text (`50.00%`). Accept both. A bare number above 1 is read as a percentage (`50` is 50%).
+- **Percent Credit in Sim** may arrive as a number (`0.5`) or text (`50.00%`). Accept both. A bare number above 1 is read as a percentage (`50` is 50%). Anything above 100%, below 0, or not finite is clamped: 100%, 0, 0. A Volume Required that is not a finite number above 0 means nothing to count.
 - **Volume Required** may arrive as a number, a numeric string, blank, or text such as `X`.
 - **Mission Number must be stored as plain text**, so values like `0123` or `1E5` are not altered by Sheets.
 - **POST with `Content-Type: text/plain`.** Apps Script does not answer CORS preflight requests, and `application/json` triggers one.
