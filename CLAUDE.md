@@ -39,7 +39,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 - **Mission Number** says what kind of row it is: blank = ground training, `SIM` (trimmed, any case) = simulator, anything else = aircraft.
 - **Due Date Override** is the one hand-only column. A date there is the expiration an official document states for that one accomplishment (a DD 2992, a waiver, an extension). It belongs to the row, not the event: when that row is the event's Last Accomplished, the summary uses it instead of the label's date; a newer accomplishment supersedes it like any other date. It never affects volume. The app never writes or reads it; the result reaches the app through the summary. The script adds the header to a log made before the column existed.
 - No other columns, ever: no row IDs, timestamps, names, counts or notes.
-- The log is the only record of accomplishments. The user may add, fix or delete rows by hand in the sheet, and that must just work.
+- The log is the only record of accomplishments. The user may add, fix or delete rows by hand in the sheet, and that must just work. Deleting a whole row fires no edit trigger in Sheets, so the summary tab catches up at the next open, save or Apollo → Refresh; a sync is always computed fresh, so the app is never behind.
 - A row whose Training ID is not in either config tab is kept and ignored. Training IDs are matched trimmed and case-insensitive.
 - A row whose Date cannot be read as a date is ignored.
 - The script writes the four headers if row 1 is empty, adds any missing header in the next free column, keeps the Mission Number column formatted as plain text, and formats a date column it adds as `yyyy-mm-dd`.
@@ -245,7 +245,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`), `apollo.queue` (`[{ batchId, rows }]`) and `apollo.lock` (`{ id, at }`, the logging tab's heartbeat).
 
-**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline. Every file, page or asset, is network-first and revalidated past the browser's HTTP cache, with the cached copy as the offline fallback, so a new page and its new script always arrive together (cache-first assets once paired a new page with an old script); API calls are never intercepted. Only the app's own address falls back to the app shell; a page never saved on the device shows a plain offline message instead. On activation the worker deletes only its own earlier caches (`apollo-*`), because cache storage is shared by every app on the `github.io` origin. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
+**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline. Every file, page or asset, is network-first and revalidated past the browser's HTTP cache, with the cached copy as the offline fallback, so in practice a new page and its new script arrive together (cache-first assets once paired a new page with an old script; the two fetches from one host within a second can still in principle split, which is accepted); API calls are never intercepted. Only the app's own address falls back to the app shell; a page never saved on the device shows a plain offline message instead. On activation the worker deletes only its own earlier caches (`apollo-*`), because cache storage is shared by every app on the `github.io` origin. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
 
 ## Sharing (milestone 3)
 
@@ -286,6 +286,8 @@ Do not add these. The user and their training office handle them.
 - CSV/XLSX export (the workbook is the export)
 
 Not rules, but handled by the Due Date Override column in the log: waivers, extensions, deployment grace periods, and any requirement whose expiration is stated on a form (the flight physical's DD 2992 gave 2027-06-10 for an exam on 2026-03-13, which no interval label produces).
+
+Also not a rule: administrative relief. When the training office prorates an unaccomplished event at the FY close-out, that credit is logged as an ordinary row dated when it was granted (30 Sep) with a plain mission note such as `PRORATED`. Any non-SIM mission text is an aircraft row, so the rules do the work and nothing in the code knows the word. This belongs in the guide's FAQ when milestone 3 resumes.
 
 ## Parked
 
