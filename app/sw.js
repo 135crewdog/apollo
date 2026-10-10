@@ -1,7 +1,7 @@
 /* Apollo service worker: caches the app shell so the app opens offline.
  * Bump VERSION on every change to any file in app/, or devices keep the old copy.
  * API calls go to another origin and are never intercepted. */
-var VERSION = 'apollo-2026.10.10.2';
+var VERSION = 'apollo-2026.10.10.3';
 var SHELL = ['./', './index.html', './app.js', './style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (event) {
