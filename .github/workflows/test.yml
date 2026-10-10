@@ -1,9 +1,12 @@
+# Unit tests and the browser smoke test, on every push and pull request, and as the gate
+# in front of the Pages deploy (pages.yml calls this workflow).
 name: Tests
 on:
   push:
   pull_request:
+  workflow_call:
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,3 +14,14 @@ jobs:
         with:
           node-version: 22
       - run: node --test
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Playwright is a development tool, not an app dependency: nothing is saved to the repository.
+      - run: npm install --no-save --no-package-lock playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/browser/smoke.js

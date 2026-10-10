@@ -39,6 +39,6 @@ Paste `WEB_APP_URL?token=YOUR_TOKEN` into a browser. The reply is JSON:
 
 ## Changing the app
 
-The app is static files published to GitHub Pages by `.github/workflows/pages.yml` on every push to `main` that touches `app/`, at `https://135crewdog.github.io/apollo/`. One hosted copy serves everyone; each person's data stays in their own workbook. Pages was turned on once in the repo under **Settings → Pages → Source: GitHub Actions**.
+The app is static files published to GitHub Pages by `.github/workflows/pages.yml` on every push to `main` that touches `app/`, after the unit tests and the browser smoke test pass, at `https://135crewdog.github.io/apollo/`. One hosted copy serves everyone; each person's data stays in their own workbook. Pages was turned on once in the repo under **Settings → Pages → Source: GitHub Actions**.
 
 When you change anything under `app/`, bump `VERSION` in `app/sw.js` and `APP_VERSION` in `app/app.js`, or devices keep the old copy. The app does no currency, volume or date math; it displays what the script returns.

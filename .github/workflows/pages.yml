@@ -14,7 +14,11 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  # A deploy waits for the unit tests and the browser smoke test to pass.
+  test:
+    uses: ./.github/workflows/test.yml
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
