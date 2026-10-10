@@ -7,9 +7,7 @@
   --text: #000000;
   --text2: #8e8e93;
   --fill: #e5e5ea;
-  --fill2: #d1d1d6;
   --destructive: #ff3b30;
-  --success: #34c759;
   --warning: #8a6400;
   --warning-bg: #fff9e6;
   --warning-border: rgba(255, 204, 0, 0.5);
@@ -33,7 +31,6 @@
   --text: #ffffff;
   --text2: #98989d;
   --fill: #48484a;
-  --fill2: #3a3a3c;
   --destructive: #ff453a;
   --warning: #ffd60a;
   --warning-bg: #3d2e00;
@@ -144,7 +141,6 @@ label.check input { width: 20px; height: 20px; accent-color: var(--red); }
 }
 .btn.primary { background: var(--red); color: var(--on-accent); }
 .btn.secondary { background: var(--fill); color: var(--text); }
-.btn.success { background: var(--success); color: #ffffff; }
 .btn.outline-destructive { background: transparent; border: 1px solid var(--destructive); color: var(--destructive); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .btn-row { display: flex; gap: 12px; }

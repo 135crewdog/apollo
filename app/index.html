@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Apollo</title>
 <meta name="theme-color" content="#ffffff">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Apollo">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -43,7 +42,7 @@
             <div class="section-title">Sortie</div>
             <div class="card">
               <div class="input-group" id="mission-field">
-                <label for="mission">Mission Number</label>
+                <label for="mission">Mission number</label>
                 <input id="mission" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. 0123">
               </div>
               <div class="input-group last">
@@ -127,26 +126,15 @@
         <div class="section-title">Help</div>
         <div class="card">
           <a class="link" href="guide/" target="_blank" rel="noopener">Setup guide</a>
-          <a class="link" href="mailto:135crewdog.github@gmail.com?subject=Apollo%20App%20Feedback">Send Feedback</a>
+          <a class="link" href="mailto:135crewdog.github@gmail.com?subject=Apollo%20App%20Feedback">Send feedback</a>
         </div>
       </div>
-      <p class="version">Apollo v<span id="version"></span> · all dates are Zulu</p>
+      <p class="version">Apollo v<span id="version"></span> · All dates are Zulu</p>
     </div>
   </div>
 
 </div>
 <div id="toast" class="toast hidden" role="status"></div>
-<script>
-// If an older service worker handed this app shell to a different page's address (the
-// guide, for example), let the updated worker take over and load the right page.
-(function () {
-  var here = location.pathname;
-  var isAppRoot = /\/(index\.html)?$/.test(here) && !/\/guide\/(index\.html)?$/.test(here);
-  if (isAppRoot || !('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.addEventListener('controllerchange', function () { location.reload(); });
-  navigator.serviceWorker.getRegistration().then(function (r) { if (r) r.update(); });
-})();
-</script>
 <script src="app.js"></script>
 </body>
 </html>

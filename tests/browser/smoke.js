@@ -54,8 +54,7 @@ async function main() {
   // The offline step makes the browser log its own failed fetch; that is expected.
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   const shots = process.argv[2];
-  // Panels slide for 300 ms, so let a screenshot wait for the transition to finish.
-  const shot = async (name, p = page) => { if (shots) { await p.waitForTimeout(400); await p.screenshot({ path: path.join(shots, name + '.png') }); } };
+  const shot = async (name, p = page) => { if (shots) await p.screenshot({ path: path.join(shots, name + '.png') }); };
 
   try {
     await page.goto(appUrl);
@@ -88,6 +87,7 @@ async function main() {
     assert.deepEqual(names, ['Landing', 'Tanker AAR Autopilot Off', 'CRM/TEM Refresher', 'NVG Sortie'], 'task name leads');
     const dues = await page.locator('#summary .item .due').allTextContents();
     assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', 'OVERDUE 30-Sep-26', 'No due date'], 'due badges in DD-Mmm-YY');
+    assert.deepEqual(await page.locator('#summary .item .due').evaluateAll((els) => els.map((e) => e.className)), ['due band-overdue', 'due band-overdue', 'due band-overdue', 'due'], 'bands from the payload');
     await shot('status-before');
 
     // Status search narrows by name or ID, and clears back to the full list.
@@ -112,6 +112,8 @@ async function main() {
     assert.equal(await page.locator('#events .event').count(), 3, 'all flying events in Flight');
     assert.deepEqual(await page.locator('#events ul').evaluateAll((els) => els.map((u) => u.dataset.group)), ['AL', 'AN', 'RT'], 'one card per Task ID prefix, no headings');
     assert.equal(await page.locator('#events .group').count(), 0, 'no group headings');
+    await page.fill('#search', 'zzz');
+    assert.equal(await page.textContent('#events .empty'), 'No events match.', 'Log search empty state');
     await page.fill('#search', 'land');
     assert.equal(await page.locator('#events .event').count(), 1);
     assert.deepEqual(await page.locator('#events ul').evaluateAll((els) => els.map((u) => u.dataset.group)), ['AL'], 'only groups with matches keep a card');

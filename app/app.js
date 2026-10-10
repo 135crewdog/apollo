@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.09.4';
+var APP_VERSION = '2026.10.10.1';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
 
 // ---------------------------------------------------------------------------
@@ -39,24 +39,6 @@ function formatDisplayDate(iso) {
   if (!isIsoDate(iso)) return iso == null ? '' : String(iso);
   var p = iso.split('-');
   return p[2] + '-' + MONTHS[Number(p[1]) - 1] + '-' + p[0].slice(2);
-}
-
-/** Whole days from a to b, both 'YYYY-MM-DD', on UTC calendar numbers. Display only. */
-function daysBetween(a, b) {
-  var pa = a.split('-').map(Number), pb = b.split('-').map(Number);
-  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
-}
-
-/** Color band for a summary row, the same bands as the sheet's Due Date column. */
-function dueBand(row, today) {
-  if (row['Overdue'] === 'YES') return 'overdue';
-  var due = row['Due Date'];
-  if (!isIsoDate(due) || !isIsoDate(today)) return '';
-  var d = daysBetween(today, due);
-  if (d <= 30) return 'd30';
-  if (d <= 60) return 'd60';
-  if (d <= 90) return 'd90';
-  return '';
 }
 
 /** 0 overdue, 1 CHECK LABEL, 2 has a due date, 3 no due date. */
@@ -280,9 +262,11 @@ if (typeof document !== 'undefined') {
       var events = filterEvents(all, ui.query);
       var box = $('events');
       box.textContent = '';
-      if (!all.length) {
+      if (!events.length) {
         var ul = el('ul');
-        ul.appendChild(el('li', 'empty', data.asOf ? 'No events in this config tab.' : 'No config yet. Open Settings, enter the web app URL and token, then Sync now.'));
+        var why = !data.asOf ? 'No config yet. Open Settings, enter the web app URL and token, then Sync now.'
+          : !all.length ? 'No events in this config tab.' : 'No events match.';
+        ul.appendChild(el('li', 'empty', why));
         box.appendChild(ul);
       }
       // One card per RTM group, no heading: the prefix means nothing to a user.
@@ -367,9 +351,9 @@ if (typeof document !== 'undefined') {
         list.appendChild(el('li', 'empty', 'No events match.'));
         return;
       }
-      var today = todayUtc();
       rows.forEach(function (r) {
-        var band = dueBand(r, today);
+        // The band comes with the row from the script, the same list that colors the sheet.
+        var band = r.band || '';
         var li = el('li', 'item');
         var head = el('div', 'head');
         var left = el('div', 'label');
@@ -657,8 +641,6 @@ if (typeof module !== 'undefined' && module.exports) {
     todayUtc: todayUtc,
     isIsoDate: isIsoDate,
     formatDisplayDate: formatDisplayDate,
-    daysBetween: daysBetween,
-    dueBand: dueBand,
     statusGroup: statusGroup,
     sortSummary: sortSummary,
     eventsForMode: eventsForMode,
