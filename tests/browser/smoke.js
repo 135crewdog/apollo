@@ -4,7 +4,9 @@
  * (a developer tool, not an app dependency): `node tests/browser/smoke.js`.
  * Serves app/ on one port and the mock API on another, then drives the app:
  * settings, sync, a flight with two landings, an offline save that syncs
- * when the connection returns, and the service worker.
+ * when the connection returns, a full store, a second tab, a URL change with
+ * rows pending, a late reply after Clear, the handoff link, the guide, and the
+ * service worker.
  * Pass a directory as the first argument to save a screenshot of each screen there.
  */
 const http = require('node:http');
@@ -18,7 +20,10 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const TODAY = new Date().toISOString().slice(0, 10);
 
 function serveApp() {
-  return http.createServer((req, res) => {
+  // While server.down is true every request is dropped mid-connection, so a service worker's
+  // own fetch fails the way it does with no network (a context's offline mode does not reach it).
+  const server = http.createServer((req, res) => {
+    if (server.down) { req.destroy(); return; }
     let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (p.endsWith('/')) p += 'index.html';
     const file = path.join(APP_DIR, p);
@@ -26,6 +31,8 @@ function serveApp() {
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     fs.createReadStream(file).pipe(res);
   });
+  server.down = false;
+  return server;
 }
 
 function listen(server) {
@@ -153,6 +160,89 @@ async function main() {
     assert.ok(landing.includes('2 of 12 this FY'), 'volume shown from the summary: ' + landing);
     await shot('status-after');
 
+    // Space on a focused stepper counts one and keeps the keyboard on that stepper.
+    await page.click('.seg-tabs button[data-tab="log"]');
+    await page.click('.toggle-group button[data-mode="flight"]');
+    await page.focus('#events button[data-id="AL01YM"][data-delta="1"]');
+    await page.keyboard.press('Space');
+    assert.equal(await page.textContent('#save'), 'Save 1 row', 'Space counts one');
+    assert.deepEqual(await page.evaluate(() => [document.activeElement.dataset.id, document.activeElement.dataset.delta]), ['AL01YM', '1'], 'focus stays on the stepper');
+    await page.keyboard.press('Space');
+    assert.equal(await page.textContent('#save'), 'Save 2 rows');
+
+    // A full or blocked store: Save says so and the taps stay on the screen; nothing is queued.
+    await page.fill('#mission', '0456');
+    await page.evaluate(() => {
+      const real = Storage.prototype.setItem;
+      window.__realSetItem = real;
+      Storage.prototype.setItem = function (k, v) { if (k === 'apollo.queue') throw new DOMException('full', 'QuotaExceededError'); return real.call(this, k, v); };
+    });
+    const postsBeforeQuota = api.state.posts;
+    await page.click('#save');
+    await page.waitForFunction(() => document.getElementById('toast').textContent.includes('storage is full or blocked'));
+    assert.equal(await page.textContent('#save'), 'Save 2 rows', 'taps kept after a failed save');
+    assert.equal(await page.inputValue('#mission'), '0456', 'mission kept after a failed save');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('apollo.queue')).length), 0, 'nothing queued');
+    assert.equal(api.state.posts, postsBeforeQuota, 'nothing sent');
+    await page.evaluate(() => { Storage.prototype.setItem = window.__realSetItem; });
+    await page.click('#save');
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
+    assert.equal(api.state.log.filter((r) => r.mission === '0456').length, 2, 'the kept taps save once storage works');
+
+    // A second tab in the same browser watches; only the first logs. Closing it frees the lock.
+    const tab2 = await context.newPage();
+    tab2.on('pageerror', (e) => errors.push(e.message));
+    await tab2.goto(appUrl);
+    await tab2.waitForSelector('#events .event');
+    assert.ok((await tab2.textContent('#lock-notice')).includes('open in another tab'), 'second tab shows the notice');
+    assert.equal(await tab2.isDisabled('#events button[data-id="AL01YM"][data-delta="1"]'), true, 'steppers off in the second tab');
+    assert.equal(await tab2.isDisabled('#save'), true, 'Save off in the second tab');
+    assert.equal(await page.textContent('#lock-notice'), '', 'first tab keeps logging');
+    assert.equal(await page.isDisabled('#events button[data-id="AL01YM"][data-delta="1"]'), false);
+    await shot('log-second-tab', tab2);
+    // The watching tab shows the logging tab's pending count.
+    await context.setOffline(true);
+    await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
+    await page.fill('#mission', '0789');
+    await page.click('#save');
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('1 row waiting to sync'));
+    await tab2.waitForFunction(() => document.getElementById('status-head').textContent.includes('1 row waiting to sync'));
+    await context.setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
+    await tab2.close();
+    // The first tab holds on; a new tab after the close gets the lock only if the first is gone.
+    await page.reload();
+    await page.waitForSelector('#events .event');
+    assert.equal(await page.textContent('#lock-notice'), '', 'a reloaded single tab logs');
+
+    // A new web app URL is refused while rows are pending; the draft survives the refusal.
+    await context.setOffline(true);
+    await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
+    await page.fill('#mission', '0321');
+    await page.click('#save');
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('1 row waiting to sync'));
+    await page.click('#settings-btn');
+    await page.fill('#url', apiUrl + '?other=1');
+    await page.click('#save-settings');
+    await page.waitForFunction(() => document.getElementById('settings-error').textContent.includes('Sync them first'));
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).url), apiUrl, 'URL unchanged with rows pending');
+    assert.equal(await page.inputValue('#url'), apiUrl + '?other=1', 'the typed URL is still in the field');
+    // Settings drafts survive a sync.
+    await page.fill('#url', apiUrl);
+    await page.fill('#token', 'draft-not-saved');
+    await context.setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForFunction(() => document.getElementById('sync-status').textContent.startsWith('Last sync'));
+    await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
+    assert.equal(await page.inputValue('#token'), 'draft-not-saved', 'draft token survives a sync');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).token), 'abc123', 'saved token untouched');
+    assert.equal(api.state.log.filter((r) => r.mission === '0321').length, 1, 'pending row synced to the current workbook');
+    await page.click('#done');
+    await page.click('#settings-btn');
+    assert.equal(await page.inputValue('#token'), 'abc123', 'reopening Settings shows the saved token');
+    await page.click('#done');
+
     // Local state survives a reload, and the service worker is registered.
     await page.reload();
     await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller !== null || (navigator.serviceWorker.getRegistrations && true));
@@ -166,13 +256,13 @@ async function main() {
 
     // Offline, the whole shell (page, script, styles) comes from the service worker's cache.
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
-    await context.setOffline(true);
+    appServer.down = true;
     await page.reload();
     await page.waitForSelector('#events .event');
     const appVersion = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'app.js'), 'utf8').match(/APP_VERSION = '([^']+)'/)[1];
     assert.equal(await page.textContent('#version'), appVersion, 'script loaded from cache offline');
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app')).maxWidth), '720px', 'styles loaded from cache offline');
-    await context.setOffline(false);
+    appServer.down = false;
 
     // The handoff link: a fresh device opens the app URL with the connection in the fragment.
     const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -185,7 +275,44 @@ async function main() {
     assert.equal(await p2.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).token), 'abc123', 'token saved from the handoff');
     await p2.click('#settings-btn');
     assert.equal(await p2.inputValue('#url'), apiUrl, 'url saved from the handoff');
+
+    // A reply that arrives after Clear local data is dropped.
+    p2.on('dialog', (d) => d.accept());
+    api.state.delay = 1500;
+    await p2.click('#sync-now');
+    await p2.click('#clear-data');
+    await p2.waitForFunction(() => document.getElementById('toast').textContent.includes('Local data cleared'));
+    await p2.waitForTimeout(2500);
+    api.state.delay = 0;
+    assert.equal(await p2.evaluate(() => JSON.parse(localStorage.getItem('apollo.data') || 'null')), null, 'late reply not stored after Clear');
+    assert.equal(await p2.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).url), '', 'connection stays cleared');
+    assert.equal(await p2.inputValue('#url'), '', 'the URL field is cleared');
+    assert.equal(await p2.textContent('#sync-status'), 'Not synced yet', 'no sync recorded');
+    // A cold offline visit to a page never saved on this device says so rather than becoming the app.
+    await p2.evaluate(() => navigator.serviceWorker.ready);
+    appServer.down = true;
+    const cold = await fresh.newPage();
+    await cold.goto(appUrl + 'guide/');
+    assert.match(await cold.textContent('body'), /^Offline\. This page has not been saved on this device yet/, 'offline guide shows the offline text');
+    assert.notEqual(await cold.title(), 'Apollo', 'offline guide is not the app shell');
+    // The app's own address still opens from the cache.
+    await cold.goto(appUrl);
+    await cold.waitForSelector('#screen-settings');
+    assert.equal(await cold.title(), 'Apollo', 'the app shell comes from the cache');
+    appServer.down = false;
+    await cold.close();
     await fresh.close();
+
+    // Another app's cache on the same origin survives the service worker's activation.
+    const shared = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await shared.addInitScript(() => { window.__seed = caches.open('showtime-v1'); });
+    const p3 = await shared.newPage();
+    p3.on('pageerror', (e) => errors.push(e.message));
+    await p3.goto(appUrl);
+    await p3.evaluate(() => window.__seed.then(() => navigator.serviceWorker.ready));
+    await p3.waitForFunction(() => caches.keys().then((k) => k.some((n) => n.startsWith('apollo-'))));
+    assert.equal(await p3.evaluate(() => caches.has('showtime-v1')), true, 'showtime cache kept');
+    await shared.close();
 
     // The guide page: loads under the app's scope, fetches the two script files, and the
     // service worker does not swap it for the app shell.
