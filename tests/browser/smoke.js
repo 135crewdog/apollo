@@ -14,6 +14,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { createMockApi } = require('./mock-api.js');
+const rules = require('../../apps-script/rules.js');
+const app = require('../../app/app.js');
 
 const APP_DIR = path.join(__dirname, '..', '..', 'app');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -48,6 +50,10 @@ async function main() {
     { id: 'RT05YM', name: 'Tanker AAR Autopilot Off', label: 'Semi-Annual', volumeRequired: 4, percentCreditInSim: 0.5 },
   ];
   const api = createMockApi({ token: 'abc123', ground, flying, today: TODAY, log: [{ mission: '', date: '2025-05-01', id: 'GD27YM' }] });
+  // Dated expectations come from the rules, not from a calendar read when this was written.
+  const gdDue = rules.dueDate('Annual', '2025-05-01');
+  assert.ok(gdDue < TODAY, 'the fixture row is overdue on any day this test runs');
+  const gdBadge = 'OVERDUE ' + app.formatDisplayDate(gdDue);
   const appServer = serveApp();
   const [appPort, apiPort] = await Promise.all([listen(appServer), listen(api.server)]);
   const appUrl = `http://127.0.0.1:${appPort}/`;
@@ -85,7 +91,7 @@ async function main() {
     assert.equal(await page.isVisible('#view-main'), true, 'Done returns to the main view');
 
     // Status: overdue first. Never-logged AL01YM and RT05YM (blank due date) sort ahead of
-    // GD27YM (Annual from 2025-05-01, due 2026-09-30, overdue); AN01YM has no due date and is last.
+    // GD27YM (Annual from 2025-05-01, overdue); AN01YM has no due date and is last.
     await page.click('.seg-tabs button[data-tab="status"]');
     const order = await page.locator('#summary .item .id').allTextContents();
     assert.deepEqual(order, ['AL01YM', 'RT05YM', 'GD27YM', 'AN01YM'], 'status order');
@@ -93,7 +99,7 @@ async function main() {
     const names = await page.locator('#summary .item .name').allTextContents();
     assert.deepEqual(names, ['Landing', 'Tanker AAR Autopilot Off', 'CRM/TEM Refresher', 'NVG Sortie'], 'task name leads');
     const dues = await page.locator('#summary .item .due').allTextContents();
-    assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', 'OVERDUE 30-Sep-26', 'No due date'], 'due badges in DD-Mmm-YY');
+    assert.deepEqual(dues, ['OVERDUE', 'OVERDUE', gdBadge, 'No due date'], 'due badges in DD-Mmm-YY');
     assert.deepEqual(await page.locator('#summary .item .due').evaluateAll((els) => els.map((e) => e.className)), ['due band-overdue', 'due band-overdue', 'due band-overdue', 'due'], 'bands from the payload');
     await shot('status-before');
 
