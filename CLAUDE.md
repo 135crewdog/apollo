@@ -171,7 +171,7 @@ In the sheet, Task ID through Overdue are written as plain text, so dates stay `
 
 ### Due Date colors
 
-The script writes conditional formatting on the Due Date column on every refresh, so it survives the rewrite and travels with the template. Display only; no rule lives here. First match wins.
+The bands are one list in `rules.js` (`DUE_BANDS`) that feeds both the sheet's conditional formatting and the `band` field on each summary row in the API, so the app displays a band without doing date math. The script sets the summary tab's text and percent formats, frozen header and color rules once, on whole columns, when the tab is created, rebuilt or found unformatted; a refresh clears and rewrites values only. Display only; no rule lives here. First match wins.
 
 | Band | Test | Color |
 |---|---|---|
@@ -212,18 +212,18 @@ tests/browser/            smoke.js drives the app in Chromium against mock-api.j
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
 - **The script is bound to the workbook**, so a copy of the workbook carries the script with it. The user pastes `rules.js` and `Code.js` into Extensions → Apps Script (two files, `Code.gs` and `rules.gs`) and deploys as a web app (Execute as: Me; Access: Anyone). After a code change, paste again and deploy a **new version** of the same deployment, or the web app keeps serving old code while the sheet triggers run the new code.
-- **Refresh** rewrites the Individual Training Summary, reapplies its Due Date colors, and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every GET and POST, and from a custom menu (Apollo → Refresh). A failure inside a trigger shows as a toast in the sheet rather than failing silently.
+- **Refresh** rewrites the Individual Training Summary and runs the log check. It runs on open, on any hand edit to the log or config tabs, on every POST, and from a custom menu (Apollo → Refresh). A GET computes the same payload without writing the sheet, so a sync does not wait on a write. A failure inside a trigger shows as a toast in the sheet rather than failing silently. Each input tab is read in one call per refresh and nothing is read twice.
 - **The app is offline-first.** A log entry goes into a local queue at once and syncs when there is a connection. Config, summary and queue are kept in `localStorage`.
 
 ### Web app API
 
 Every response is JSON. Apps Script cannot set HTTP status codes, so errors come back as `{ "ok": false, "error": "..." }`.
 
-- `GET ?token=…` refreshes the summary and returns `{ ok, asOf, ground, flying, summary, logCheck }`.
+- `GET ?token=…` computes the summary (without writing the sheet) and returns `{ ok, asOf, ground, flying, summary, logCheck }`.
   - `asOf` is today's UTC date.
   - `ground` is `[{ id, name, frequency }]`.
   - `flying` is `[{ id, name, currency, volumeRequired, percentCreditInSim }]` with `volumeRequired` a number or `null` and `percentCreditInSim` a fraction, so the app can hide 0% events in Sim without parsing.
-  - `summary` is one object per summary row, keyed by the summary tab's column headers.
+  - `summary` is one object per summary row, keyed by the summary tab's column headers, plus `band`: `overdue`, `d30`, `d60`, `d90` or `''` from the Due Date colors table, computed for `asOf`.
   - `logCheck` is `[{ row, mission, date, id, problem }]` from the log check above, empty when the log is clean. `row` is the sheet row number.
 - `POST` with body `{ token, batchId, rows: [{ mission, date, id }] }` appends the rows (Due Date Override left blank), refreshes, and returns the same payload as GET. `batchId` is required. Every `date` must be `YYYY-MM-DD` and every `id` non-empty or the whole batch is rejected and nothing is appended.
 - **The token** is a shared secret in Script Properties under `APOLLO_TOKEN`. Use lowercase letters and digits only; other characters caused a `Bad token` reply from the URL. Eight or more characters is enough; it guards a training log. The app stores the web app URL and token from its Settings screen. Never commit either.

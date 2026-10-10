@@ -14,7 +14,7 @@ function createMockApi({ token, ground, flying, log = [], today }) {
     asOf: today,
     ground: ground.map((g) => ({ id: g.id, name: g.name, frequency: g.label })),
     flying: flying.map((f) => ({ id: f.id, name: f.name, currency: f.label, volumeRequired: rules.parseVolume(f.volumeRequired), percentCreditInSim: rules.parsePercent(f.percentCreditInSim) })),
-    summary: rules.buildSummary(ground, flying, state.log, today),
+    summary: rules.buildSummary(ground, flying, state.log, today).map((row) => ({ band: rules.dueBand(row, today), ...row })),
     logCheck: rules.checkLog(state.log.map((r, i) => ({ ...r, row: i + 2 })), ground, flying, today),
   });
   const server = http.createServer((req, res) => {

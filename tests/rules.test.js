@@ -487,11 +487,21 @@ test('SUMMARY_HEADERS: Task ID leads, then the CLAUDE.md columns', () => {
   ]);
 });
 
-test('formatPercent', () => {
-  assert.equal(rules.formatPercent(0.5), '50%');
-  assert.equal(rules.formatPercent(1), '100%');
-  assert.equal(rules.formatPercent(0), '0%');
-  assert.equal(rules.formatPercent(''), '');
+test('dueBand: the same bands as the sheet, from the Overdue flag and the Due Date', () => {
+  const today = '2026-10-07';
+  const row = (due, overdue) => ({ 'Due Date': due, 'Overdue': overdue || '' });
+  assert.equal(rules.dueBand(row('', 'YES'), today), 'overdue');
+  assert.equal(rules.dueBand(row('2026-06-30', 'YES'), today), 'overdue');
+  assert.equal(rules.dueBand(row('2026-10-31'), today), 'd30');
+  assert.equal(rules.dueBand(row('2026-11-06'), today), 'd30');
+  assert.equal(rules.dueBand(row('2026-11-07'), today), 'd60');
+  assert.equal(rules.dueBand(row('2026-12-06'), today), 'd60');
+  assert.equal(rules.dueBand(row('2026-12-31'), today), 'd90');
+  assert.equal(rules.dueBand(row('2027-01-05'), today), 'd90');
+  assert.equal(rules.dueBand(row('2027-01-06'), today), '');
+  assert.equal(rules.dueBand(row(''), today), '');
+  assert.equal(rules.dueBand(row('CHECK LABEL'), today), '');
+  assert.deepEqual(rules.DUE_BANDS.map((b) => b.band), ['overdue', 'd30', 'd60', 'd90']);
 });
 
 // ---------------------------------------------------------------------------
@@ -504,15 +514,16 @@ test('fiscalYear', () => {
   assert.equal(rules.fiscalYear(rules.parseDate('2027-01-01')), 2027);
 });
 
-test('addDays and addMonths handle leap years and month ends', () => {
+test('addDays handles leap years and year ends', () => {
   const f = (s, n) => rules.formatDate(rules.addDays(rules.parseDate(s), n));
   assert.equal(f('2024-02-28', 1), '2024-02-29');
   assert.equal(f('2023-02-28', 1), '2023-03-01');
   assert.equal(f('2026-12-31', 1), '2027-01-01');
   assert.equal(f('2100-02-28', 1), '2100-03-01');
-  const g = (s, n) => rules.formatDate(rules.addMonths(rules.parseDate(s), n));
-  assert.equal(g('2026-01-31', 1), '2026-02-28');
-  assert.equal(g('2024-01-31', 1), '2024-02-29');
-  assert.equal(g('2026-11-30', 3), '2027-02-28');
-  assert.equal(g('2026-03-31', 1), '2026-04-30');
+});
+
+test('labels use the RTM words: abbreviations are CHECK LABEL', () => {
+  assert.equal(rules.dueDate('5 yrs', '2022-01-15'), rules.CHECK_LABEL);
+  assert.equal(rules.dueDate('60 mos', '2022-03-05'), rules.CHECK_LABEL);
+  assert.equal(rules.dueDate('5Years', '2022-01-15'), '2027-09-30');
 });

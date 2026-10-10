@@ -48,7 +48,7 @@ function refresh() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
     var result = refreshSummary(ss);
-    ss.toast(describeLogCheck(result.logCheck, result.logRows), 'Apollo', 15);
+    ss.toast(describeLogCheck(result.logCheck, result.log.length), 'Apollo', 15);
   } catch (err) {
     ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
   }
@@ -59,7 +59,7 @@ function safeRefresh() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
     var result = refreshSummary(ss);
-    if (result.logCheck.length) ss.toast(describeLogCheck(result.logCheck, result.logRows), 'Apollo', 15);
+    if (result.logCheck.length) ss.toast(describeLogCheck(result.logCheck, result.log.length), 'Apollo', 15);
   } catch (err) {
     ss.toast(String(err && err.message ? err.message : err), 'Apollo refresh failed', 15);
   }
@@ -129,15 +129,30 @@ function connectDevice() {
 // Refresh
 // ---------------------------------------------------------------------------
 
-/** Returns { summary, logCheck, logRows }. */
-function refreshSummary(ss) {
+/**
+ * Read the three input tabs once and compute the summary and the log check.
+ * Writes nothing. Returns { ground, flying, log, day, summary, logCheck }.
+ */
+function computeSummary(ss) {
   var ground = readGround(ss);
   var flying = readFlying(ss);
   var log = readLog(ss);
   var day = today();
-  var rows = buildSummary(ground, flying, log, day);
-  writeSummary(ss, rows);
-  return { summary: rows, logCheck: checkLog(log, ground, flying, day), logRows: log.length };
+  return {
+    ground: ground,
+    flying: flying,
+    log: log,
+    day: day,
+    summary: buildSummary(ground, flying, log, day),
+    logCheck: checkLog(log, ground, flying, day)
+  };
+}
+
+/** Compute, then rewrite the Individual Training Summary tab. */
+function refreshSummary(ss) {
+  var result = computeSummary(ss);
+  writeSummary(ss, result.summary);
+  return result;
 }
 
 /** Today's date in Zulu (UTC). Every date in Apollo is Zulu, no exceptions. */
@@ -164,63 +179,48 @@ function writeSummary(ss, rows) {
   fillSummary(sheet, values);
 }
 
+/**
+ * A refresh clears and rewrites the values. The text and percent formats, the frozen
+ * header and the Due Date colors are set once, on whole columns, and survive every
+ * refresh; a tab whose last row is not yet text-formatted has not had that done.
+ */
 function fillSummary(sheet, values) {
-  sheet.clear();
-  // A filter or sort left on this tab by hand survives clear() and reorders
-  // rows under the next write. The tab is script-owned, so drop it.
+  if (sheet.getRange(sheet.getMaxRows(), 1).getNumberFormat() !== '@') formatSummary(sheet);
+  // A filter or sort left on this tab by hand reorders rows under the next write.
   var filter = sheet.getFilter();
   if (filter) filter.remove();
-  // Task Name .. Overdue are text so 'YYYY-MM-DD' and 'CHECK LABEL' are kept as written.
-  sheet.getRange(1, 1, values.length, 5).setNumberFormat('@');
-  if (values.length > 1) {
-    var pctCol = SUMMARY_HEADERS.indexOf('Percent Complete') + 1;
-    sheet.getRange(2, pctCol, values.length - 1, 1).setNumberFormat('0%');
-  }
+  sheet.clearContents();
   sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
+}
+
+function formatSummary(sheet) {
+  var rows = sheet.getMaxRows();
+  // Task ID .. Overdue are text so 'YYYY-MM-DD' and 'CHECK LABEL' are kept as written.
+  sheet.getRange(1, 1, rows, SUMMARY_HEADERS.indexOf('Overdue') + 1).setNumberFormat('@');
+  sheet.getRange(2, SUMMARY_HEADERS.indexOf('Percent Complete') + 1, rows - 1, 1).setNumberFormat('0%');
   sheet.setFrozenRows(1);
-  colorDueDates(sheet, values.length - 1);
+  colorDueDates(sheet, rows - 1);
 }
 
 /**
- * Due Date colors, display only: no rule lives here. Sheets evaluates these
- * with TODAY() in the workbook's time zone, which is UTC. First match wins.
+ * Due Date colors from DUE_BANDS in rules.js, the same list the API's band field
+ * uses. Sheets evaluates TODAY() in the workbook's time zone, which is UTC.
  */
-var DUE_SOON_BANDS = [
-  { days: 30, background: '#EA9999' },
-  { days: 60, background: '#F9CB9C' },
-  { days: 90, background: '#FFF2CC' }
-];
-var OVERDUE_BACKGROUND = '#666666';
-var OVERDUE_FONT = '#FFFFFF';
-
 function colorDueDates(sheet, rowCount) {
-  if (rowCount < 1) {
-    sheet.setConditionalFormatRules([]);
-    return;
-  }
   var dueCol = SUMMARY_HEADERS.indexOf('Due Date') + 1;
-  var overdueCol = SUMMARY_HEADERS.indexOf('Overdue') + 1;
   var range = sheet.getRange(2, dueCol, rowCount, 1);
   var due = '$' + columnLetter(dueCol) + '2';
-  var overdue = '$' + columnLetter(overdueCol) + '2';
-  var rules = [
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=' + overdue + '="YES"')
-      .setBackground(OVERDUE_BACKGROUND)
-      .setFontColor(OVERDUE_FONT)
-      .setRanges([range])
-      .build()
-  ];
-  for (var i = 0; i < DUE_SOON_BANDS.length; i++) {
-    var band = DUE_SOON_BANDS[i];
-    rules.push(
-      SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied('=AND(' + overdue + '<>"YES", IFERROR(DATEVALUE(' + due + ') - TODAY(), 999) <= ' + band.days + ')')
-        .setBackground(band.background)
-        .setRanges([range])
-        .build()
-    );
-  }
+  var overdue = '$' + columnLetter(SUMMARY_HEADERS.indexOf('Overdue') + 1) + '2';
+  var rules = DUE_BANDS.map(function (b) {
+    var rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(b.band === 'overdue'
+        ? '=' + overdue + '="YES"'
+        : '=AND(' + overdue + '<>"YES", IFERROR(DATEVALUE(' + due + ') - TODAY(), 999) <= ' + b.days + ')')
+      .setBackground(b.background)
+      .setRanges([range]);
+    if (b.fontColor) rule.setFontColor(b.fontColor);
+    return rule.build();
+  });
   sheet.setConditionalFormatRules(rules);
 }
 
@@ -251,10 +251,10 @@ function getSheet(ss, name) {
  * Returns { col: { header: index }, rows: [[...]] } with rows below the header.
  */
 function readTable(sheet, requiredHeaders) {
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow < 1 || lastCol < 1) throw new Error('Tab "' + sheet.getName() + '" has no header row');
-  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  // One call for the whole used range: a separate last-row and last-column lookup
+  // would each be another round trip to Sheets.
+  var values = sheet.getDataRange().getValues();
+  if (!values.length || !values[0].length) throw new Error('Tab "' + sheet.getName() + '" has no header row');
   var header = values[0];
   var col = {};
   for (var i = 0; i < header.length; i++) {
@@ -320,33 +320,33 @@ function readFlying(ss) {
   return out;
 }
 
-/** Write the log headers if row 1 is empty, and keep Mission Number as plain text. */
 /**
- * Writes the log headers when row 1 is empty, and adds any header that is missing
- * (a workbook made before a column existed) in the next free column of row 1, so an
- * existing log picks up a new column on its next refresh with no hand edit.
+ * Reads row 1 of the log and returns { header: column index }. Writes the headers when
+ * row 1 is empty, and adds any header that is missing (a workbook made before a column
+ * existed) in the next free column, so an existing log picks up a new column on its
+ * next refresh with no hand edit.
  */
 function ensureLogHeaders(sheet) {
-  var lastCol = Math.max(sheet.getLastColumn(), LOG_HEADERS.length);
-  var row1 = sheet.getLastRow() >= 1 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
-  var present = {};
+  var row1 = sheet.getRange(1, 1, 1, Math.max(sheet.getMaxColumns(), LOG_HEADERS.length)).getValues()[0];
+  var col = {};
   var used = 0;
   for (var i = 0; i < row1.length; i++) {
     var text = cellText(row1[i]);
-    if (text !== '') { present[text] = true; used = i + 1; }
+    if (text !== '') { col[text] = i; used = i + 1; }
   }
   var added = false;
   for (var h = 0; h < LOG_HEADERS.length; h++) {
     var header = LOG_HEADERS[h];
-    if (present[header]) continue;
-    var col = used + 1;
-    sheet.getRange(1, col).setValue(header);
-    if (header === 'Mission Number') sheet.getRange(1, col, sheet.getMaxRows(), 1).setNumberFormat('@');
-    if (header === 'Date' || header === 'Due Date Override') sheet.getRange(2, col, sheet.getMaxRows() - 1, 1).setNumberFormat(LOG_DATE_FORMAT);
-    used = col;
+    if (header in col) continue;
+    sheet.getRange(1, used + 1).setValue(header);
+    if (header === 'Mission Number') sheet.getRange(1, used + 1, sheet.getMaxRows(), 1).setNumberFormat('@');
+    if (header === 'Date' || header === 'Due Date Override') sheet.getRange(2, used + 1, sheet.getMaxRows() - 1, 1).setNumberFormat(LOG_DATE_FORMAT);
+    col[header] = used;
+    used++;
     added = true;
   }
   if (added) sheet.setFrozenRows(1);
+  return col;
 }
 
 function readLog(ss) {
@@ -374,25 +374,24 @@ function readLog(ss) {
 // Appending log rows
 // ---------------------------------------------------------------------------
 
-/** rows: [{ mission, date, id }] already validated. */
+/** rows: [{ mission, date, id }] already validated. Reads only the header row. */
 function appendLogRows(ss, rows) {
   if (!rows.length) return;
   var sheet = getSheet(ss, TAB_LOG);
-  ensureLogHeaders(sheet);
-  var t = readTable(sheet, LOG_HEADERS);
-  var width = sheet.getLastColumn();
-  var values = [];
-  for (var i = 0; i < rows.length; i++) {
+  var col = ensureLogHeaders(sheet);
+  var width = 0;
+  Object.keys(col).forEach(function (h) { width = Math.max(width, col[h] + 1); });
+  var values = rows.map(function (r) {
     var line = [];
     for (var c = 0; c < width; c++) line.push('');
-    line[t.col['Mission Number']] = rows[i].mission;
-    line[t.col['Date']] = rows[i].date;
-    line[t.col['Training ID']] = rows[i].id;
-    values.push(line);
-  }
+    line[col['Mission Number']] = r.mission;
+    line[col['Date']] = r.date;
+    line[col['Training ID']] = r.id;
+    return line;
+  });
   var start = sheet.getLastRow() + 1;
   // Mission Number stays plain text so '0123' and '1E5' are not altered by Sheets.
-  sheet.getRange(start, t.col['Mission Number'] + 1, rows.length, 1).setNumberFormat('@');
+  sheet.getRange(start, col['Mission Number'] + 1, rows.length, 1).setNumberFormat('@');
   sheet.getRange(start, 1, rows.length, width).setValues(values);
 }
 
@@ -421,7 +420,9 @@ function doGet(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(LOCK_WAIT_MS);
     try {
-      return buildPayload(ss, refreshSummary(ss));
+      // A sync reads; it does not rewrite the summary tab. The tab refreshes on open,
+      // on edit, on every POST and from the menu.
+      return buildPayload(computeSummary(ss));
     } finally {
       lock.releaseLock();
     }
@@ -439,36 +440,39 @@ function doPost(e) {
     var lock = LockService.getScriptLock();
     lock.waitLock(LOCK_WAIT_MS);
     try {
-      if (!isKnownBatch(batchId)) {
+      var known = readBatchIds();
+      if (known.indexOf(batchId) === -1) {
         appendLogRows(ss, rows);
-        rememberBatch(batchId);
+        rememberBatch(known, batchId);
       }
-      return buildPayload(ss, refreshSummary(ss));
+      return buildPayload(refreshSummary(ss));
     } finally {
       lock.releaseLock();
     }
   });
 }
 
-function buildPayload(ss, result) {
-  var ground = readGround(ss).map(function (g) {
-    return { id: cellText(g.id), name: cellText(g.name), frequency: cellText(g.label) };
-  });
-  var flying = readFlying(ss).map(function (f) {
-    return {
-      id: cellText(f.id),
-      name: cellText(f.name),
-      currency: cellText(f.label),
-      volumeRequired: parseVolume(f.volumeRequired),
-      percentCreditInSim: parsePercent(f.percentCreditInSim)
-    };
-  });
+/** The API payload from what computeSummary read and computed; no further reads. */
+function buildPayload(result) {
   return {
     ok: true,
-    asOf: today(),
-    ground: ground,
-    flying: flying,
-    summary: result.summary,
+    asOf: result.day,
+    ground: result.ground.map(function (g) {
+      return { id: cellText(g.id), name: cellText(g.name), frequency: cellText(g.label) };
+    }),
+    flying: result.flying.map(function (f) {
+      return {
+        id: cellText(f.id),
+        name: cellText(f.name),
+        currency: cellText(f.label),
+        volumeRequired: parseVolume(f.volumeRequired),
+        percentCreditInSim: parsePercent(f.percentCreditInSim)
+      };
+    }),
+    // Each row carries its Due Date color band so the app displays it without date math.
+    summary: result.summary.map(function (row) {
+      return Object.assign({ band: dueBand(row, result.day) }, row);
+    }),
     logCheck: result.logCheck
   };
 }
@@ -502,12 +506,7 @@ function readBatchIds() {
   }
 }
 
-function isKnownBatch(batchId) {
-  return readBatchIds().indexOf(batchId) !== -1;
-}
-
-function rememberBatch(batchId) {
-  var ids = readBatchIds();
+function rememberBatch(ids, batchId) {
   ids.push(batchId);
   while (ids.length > BATCH_IDS_KEPT) ids.shift();
   PropertiesService.getScriptProperties().setProperty(PROP_BATCH_IDS, JSON.stringify(ids));

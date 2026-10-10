@@ -80,20 +80,16 @@ function addDays(ymd, n) {
   return fromDayNumber(dayNumber(ymd) + n);
 }
 
-/** Same day of the month N months later; the last day of that month if the day does not exist. */
-function addMonths(ymd, n) {
-  var total = ymd.y * 12 + (ymd.m - 1) + n;
-  var y = Math.floor(total / 12);
-  var m = total - y * 12 + 1;
-  return { y: y, m: m, d: Math.min(ymd.d, daysInMonth(y, m)) };
+/** Months since year 0, so month arithmetic is plain integer arithmetic. */
+function monthIndex(ymd) {
+  return ymd.y * 12 + ymd.m - 1;
 }
 
-function lastDayOfMonth(y, m) {
+/** The last day of the month with that index. Every due date ends on a month end. */
+function monthEnd(index) {
+  var y = Math.floor(index / 12);
+  var m = index - y * 12 + 1;
   return { y: y, m: m, d: daysInMonth(y, m) };
-}
-
-function endOfMonth(ymd) {
-  return lastDayOfMonth(ymd.y, ymd.m);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,13 +113,9 @@ function fiscalYearEnd(fy) {
  */
 function endOfNextPeriod(ymd, monthsPerPeriod) {
   // Count months with October as month 0 so periods line up with the FY.
-  var shifted = ymd.y * 12 + (ymd.m - 1) - 9;
+  var shifted = monthIndex(ymd) - 9;
   var periodStart = shifted - (((shifted % monthsPerPeriod) + monthsPerPeriod) % monthsPerPeriod);
-  var nextPeriodEnd = periodStart + monthsPerPeriod * 2 - 1;
-  var total = nextPeriodEnd + 9;
-  var y = Math.floor(total / 12);
-  var m = total - y * 12 + 1;
-  return lastDayOfMonth(y, m);
+  return monthEnd(periodStart + monthsPerPeriod * 2 - 1 + 9);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,11 +142,11 @@ function classifyLabel(label) {
   if (s === 'biennial') return { kind: 'fy', n: 2 };
   if (s === 'triennial') return { kind: 'fy', n: 3 };
   if (s === 'pcs' || s === 'as required' || s === 'n/a') return { kind: 'none' };
-  var m = /^(\d+) ?(years?|yrs?)$/.exec(s);
+  var m = /^(\d+) ?years?$/.exec(s);
   if (m) return { kind: 'fy', n: Number(m[1]) };
-  m = /^(\d+) ?(months?|mos?)$/.exec(s);
+  m = /^(\d+) ?months?$/.exec(s);
   if (m) return { kind: 'months', n: Number(m[1]) };
-  m = /^(\d+) ?(days?)$/.exec(s);
+  m = /^(\d+) ?days?$/.exec(s);
   if (m) return { kind: 'days', n: Number(m[1]) };
   return { kind: 'unknown' };
 }
@@ -183,11 +175,39 @@ function dueDate(label, lastAccomplished) {
     // ARMS computes every interval to the last day of the month (confirmed against
     // SARM due dates for 6, 24 and 48 Months and 365 Days on 2026-10-09).
     case 'months':
-      return formatDate(endOfMonth(addMonths(last, c.n)));
+      return formatDate(monthEnd(monthIndex(last) + c.n));
     case 'days':
-      return formatDate(endOfMonth(addDays(last, c.n)));
+      return formatDate(monthEnd(monthIndex(addDays(last, c.n))));
   }
   return CHECK_LABEL;
+}
+
+// ---------------------------------------------------------------------------
+// Due Date colors
+// ---------------------------------------------------------------------------
+
+/**
+ * Display only: no rule lives here. The sheet's conditional formatting and the
+ * API's band field are both built from this list. First match wins.
+ */
+var DUE_BANDS = [
+  { band: 'overdue', background: '#666666', fontColor: '#FFFFFF' },
+  { band: 'd30', days: 30, background: '#EA9999' },
+  { band: 'd60', days: 60, background: '#F9CB9C' },
+  { band: 'd90', days: 90, background: '#FFF2CC' }
+];
+
+/** The band for a summary row on a given day: 'overdue', 'd30', 'd60', 'd90' or ''. */
+function dueBand(row, today) {
+  if (row['Overdue'] === 'YES') return 'overdue';
+  var due = parseDate(row['Due Date']);
+  var day = parseDate(today);
+  if (!due || !day) return '';
+  var days = dayNumber(due) - dayNumber(day);
+  for (var i = 1; i < DUE_BANDS.length; i++) {
+    if (days <= DUE_BANDS[i].days) return DUE_BANDS[i].band;
+  }
+  return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -265,19 +285,9 @@ function summarizeEvent(event, rows, today) {
   for (var i = 0; i < rows.length; i++) {
     var date = parseDate(rows[i].date);
     if (!date) continue;
-    var kind = rowKind(rows[i].mission);
-    var counts, bucket;
-    if (!isFlying) {
-      counts = true;
-      bucket = null;
-    } else if (kind === 'sim') {
-      counts = pct > 0;
-      bucket = 'sim';
-    } else {
-      counts = true;
-      bucket = 'aircraft';
-    }
-    if (!counts) continue;
+    // Every ground row counts. A flying row counts unless it is a SIM row at 0%.
+    var kind = isFlying ? rowKind(rows[i].mission) : 'ground';
+    if (kind === 'sim' && pct <= 0) continue;
     var dateStr = formatDate(date);
     var override = parseDate(rows[i].dueOverride);
     if (dateStr > last) {
@@ -286,8 +296,8 @@ function summarizeEvent(event, rows, today) {
     } else if (dateStr === last && override) {
       lastOverride = formatDate(override);
     }
-    if (bucket && thisFy !== null && fiscalYear(date) === thisFy) {
-      if (bucket === 'sim') simThisFy++;
+    if (isFlying && thisFy !== null && fiscalYear(date) === thisFy) {
+      if (kind === 'sim') simThisFy++;
       else aircraftThisFy++;
     }
   }
@@ -346,8 +356,8 @@ function buildSummary(ground, flying, log, today) {
   }
   var out = [];
   var push = function (event, type) {
-    event.type = type;
-    out.push(summarizeEvent(event, byId[normalizeId(event.id)] || [], today));
+    var typed = Object.assign({ type: type }, event);
+    out.push(summarizeEvent(typed, byId[normalizeId(event.id)] || [], today));
   };
   for (i = 0; i < ground.length; i++) push(ground[i], 'ground');
   for (i = 0; i < flying.length; i++) push(flying[i], 'flying');
@@ -398,12 +408,6 @@ function summaryRowToArray(row) {
   return arr;
 }
 
-/** Fraction to a whole-percent string: 0.5 -> '50%'. Blank stays blank. */
-function formatPercent(fraction) {
-  if (fraction === '' || fraction == null) return '';
-  return Math.round(fraction * 100) + '%';
-}
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SUMMARY_HEADERS: SUMMARY_HEADERS,
@@ -412,18 +416,18 @@ if (typeof module !== 'undefined' && module.exports) {
     formatDate: formatDate,
     daysInMonth: daysInMonth,
     addDays: addDays,
-    addMonths: addMonths,
     fiscalYear: fiscalYear,
     classifyLabel: classifyLabel,
     labelProducesDueDates: labelProducesDueDates,
     dueDate: dueDate,
+    DUE_BANDS: DUE_BANDS,
+    dueBand: dueBand,
     rowKind: rowKind,
     parsePercent: parsePercent,
     parseVolume: parseVolume,
     summarizeEvent: summarizeEvent,
     buildSummary: buildSummary,
     checkLog: checkLog,
-    summaryRowToArray: summaryRowToArray,
-    formatPercent: formatPercent
+    summaryRowToArray: summaryRowToArray
   };
 }
