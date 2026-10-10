@@ -8,7 +8,8 @@ const http = require('node:http');
 const rules = require('../../apps-script/rules.js');
 
 function createMockApi({ token, ground, flying, log = [], today }) {
-  const state = { log: log.slice(), batchIds: [], posts: 0 };
+  // delay: milliseconds to hold every reply, so a test can act while a call is in flight.
+  const state = { log: log.slice(), batchIds: [], posts: 0, delay: 0 };
   const payload = () => ({
     ok: true,
     asOf: today,
@@ -19,7 +20,7 @@ function createMockApi({ token, ground, flying, log = [], today }) {
   });
   const server = http.createServer((req, res) => {
     const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
-    const send = (body) => { res.writeHead(200, headers); res.end(JSON.stringify(body)); };
+    const send = (body) => setTimeout(() => { res.writeHead(200, headers); res.end(JSON.stringify(body)); }, state.delay);
     const url = new URL(req.url, 'http://localhost');
     if (req.method === 'GET') {
       if (url.searchParams.get('token') !== token) return send({ ok: false, error: 'Bad token' });

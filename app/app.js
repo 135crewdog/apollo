@@ -10,8 +10,10 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.10.1';
-var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue' };
+var APP_VERSION = '2026.10.10.2';
+var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
+/** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
+var LOCK_TTL_MS = 10000;
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -116,6 +118,7 @@ function buildRows(mode, mission, date, counts, events) {
   if (mode === 'flight') {
     if (!m) return { error: 'Enter the mission number.' };
     if (m.toUpperCase() === 'SIM') return { error: 'Use the Sim button for a simulator.' };
+    if (m.charAt(0) === '=') return { error: 'A mission number cannot start with =.' };
   }
   var missionValue = mode === 'flight' ? m : mode === 'sim' ? 'SIM' : '';
   var rows = [];
@@ -153,6 +156,21 @@ function pendingRows(queue) {
   return n;
 }
 
+/** The queue without the acknowledged batch. By ID, never by position: another tab may have added since. */
+function removeBatch(queue, batchId) {
+  return queue.filter(function (b) { return b.batchId !== batchId; });
+}
+
+/**
+ * Who holds the one-tab lock: 'mine', 'other' (a live lock held by another tab) or 'free'
+ * (no lock, or one whose heartbeat stopped more than ttl ago).
+ */
+function lockState(lock, tabId, now, ttl) {
+  if (!lock || typeof lock.at !== 'number') return 'free';
+  if (lock.id === tabId) return 'mine';
+  return now - lock.at < ttl ? 'other' : 'free';
+}
+
 function newBatchId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -186,8 +204,9 @@ if (typeof document !== 'undefined') {
         return fallback;
       }
     }
+    /** True when the write landed. A full or blocked store returns false and the caller decides. */
     function save(key, value) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* storage full or blocked */ }
+      try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (err) { return false; }
     }
     function $(id) { return document.getElementById(id); }
     function el(tag, cls, text) {
@@ -202,8 +221,36 @@ if (typeof document !== 'undefined') {
     if (!settings.theme) settings.theme = 'auto';
     var data = load(STORAGE.data, { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' });
     var queue = load(STORAGE.queue, []);
-    var ui = { tab: 'log', mode: 'flight', query: '', statusQuery: '', counts: {}, syncing: false, lastError: '', settingsOpen: false };
+    var ui = { tab: 'log', mode: 'flight', query: '', statusQuery: '', counts: {}, syncing: false, lastError: '', settingsOpen: false, dateTouched: false };
     var toastTimer = null;
+    // A reply from before Clear local data or a connection change is ignored.
+    var generation = 0;
+
+    // ---- one logging tab at a time ----
+
+    var TAB_ID = newBatchId();
+    var hasLock = false;
+
+    /** Take or keep the lock if it is free or ours; give it up if another tab holds a live one. */
+    function claimLock() {
+      var state = lockState(load(STORAGE.lock, null), TAB_ID, Date.now(), LOCK_TTL_MS);
+      var mine = state !== 'other' && save(STORAGE.lock, { id: TAB_ID, at: Date.now() });
+      if (mine !== hasLock) { hasLock = mine; render(); }
+      return hasLock;
+    }
+    function releaseLock() {
+      if (hasLock && lockState(load(STORAGE.lock, null), TAB_ID, Date.now(), LOCK_TTL_MS) === 'mine') {
+        try { localStorage.removeItem(STORAGE.lock); } catch (err) { /* it expires on its own */ }
+      }
+      hasLock = false;
+    }
+    setInterval(claimLock, LOCK_TTL_MS / 2.5);
+    window.addEventListener('pagehide', releaseLock);
+    window.addEventListener('storage', function (e) {
+      if (e.key === STORAGE.lock) claimLock();
+      // The logging tab wrote the queue; a watching tab shows its count.
+      if (e.key === STORAGE.queue && !hasLock) { queue = load(STORAGE.queue, []); render(); }
+    });
 
     // ---- theme ----
 
@@ -252,8 +299,13 @@ if (typeof document !== 'undefined') {
 
     function renderLog() {
       document.querySelectorAll('.toggle-group button').forEach(function (b) {
-        b.classList.toggle('on', b.dataset.mode === ui.mode);
+        var on = b.dataset.mode === ui.mode;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
+      var notice = $('lock-notice');
+      notice.textContent = '';
+      if (!hasLock) notice.appendChild(banner('warn', 'Apollo is open in another tab or window. Close it to log here.'));
       $('mission-field').classList.toggle('hidden', ui.mode !== 'flight');
       if (!$('date').value) $('date').value = todayUtc();
       $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date';
@@ -279,7 +331,7 @@ if (typeof document !== 'undefined') {
 
       var total = 0;
       Object.keys(ui.counts).forEach(function (id) { total += ui.counts[id]; });
-      $('save').disabled = total === 0;
+      $('save').disabled = total === 0 || !hasLock;
       $('save').textContent = total ? 'Save ' + total + (total === 1 ? ' row' : ' rows') : 'Save';
     }
 
@@ -295,13 +347,14 @@ if (typeof document !== 'undefined') {
       minus.type = 'button';
       minus.dataset.id = e.id;
       minus.dataset.delta = '-1';
-      minus.disabled = n === 0;
+      minus.disabled = n === 0 || !hasLock;
       minus.setAttribute('aria-label', 'Remove one ' + (e.name || e.id));
       var count = el('span', 'n' + (n ? '' : ' zero'), String(n));
       var plus = el('button', null, '+');
       plus.type = 'button';
       plus.dataset.id = e.id;
       plus.dataset.delta = '1';
+      plus.disabled = !hasLock;
       plus.setAttribute('aria-label', 'Add one ' + (e.name || e.id));
       stepper.appendChild(minus);
       stepper.appendChild(count);
@@ -372,9 +425,13 @@ if (typeof document !== 'undefined') {
       });
     }
 
+    /** The connection fields are filled when Settings opens and after Save or Clear, never by a status re-render. */
+    function fillSettingsForm() {
+      $('url').value = settings.url || '';
+      $('token').value = settings.token || '';
+    }
+
     function renderSettings() {
-      if (document.activeElement !== $('url')) $('url').value = settings.url || '';
-      if (document.activeElement !== $('token')) $('token').value = settings.token || '';
       $('token').type = $('show-token').checked ? 'text' : 'password';
       $('theme').value = settings.theme;
       var s = [];
@@ -386,7 +443,7 @@ if (typeof document !== 'undefined') {
       var se = $('settings-error');
       se.textContent = '';
       if (ui.lastError) se.appendChild(banner('error', ui.lastError));
-      $('version').textContent = APP_VERSION;
+      $('version').textContent = APP_VERSION + (data.scriptVersion ? ' · script v' + data.scriptVersion : '');
     }
 
     function toast(text) {
@@ -399,8 +456,8 @@ if (typeof document !== 'undefined') {
 
     // ---- sync ----
 
-    function apiUrl(params) {
-      var base = String(settings.url || '').trim();
+    function apiUrl(conn, params) {
+      var base = String(conn.url || '').trim();
       return params ? base + (base.indexOf('?') === -1 ? '?' : '&') + params : base;
     }
 
@@ -414,15 +471,15 @@ if (typeof document !== 'undefined') {
       });
     }
 
-    function apiGet() {
-      return fetch(apiUrl('token=' + encodeURIComponent(settings.token)), { method: 'GET', cache: 'no-store' }).then(parseResponse);
+    function apiGet(conn) {
+      return fetch(apiUrl(conn, 'token=' + encodeURIComponent(conn.token)), { method: 'GET', cache: 'no-store' }).then(parseResponse);
     }
 
-    function apiPost(batch) {
-      return fetch(apiUrl(), {
+    function apiPost(conn, batch) {
+      return fetch(apiUrl(conn), {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ token: settings.token, batchId: batch.batchId, rows: batch.rows })
+        body: JSON.stringify({ token: conn.token, batchId: batch.batchId, rows: batch.rows })
       }).then(parseResponse);
     }
 
@@ -432,6 +489,7 @@ if (typeof document !== 'undefined') {
       data.summary = payload.summary || [];
       data.logCheck = payload.logCheck || [];
       data.asOf = payload.asOf || '';
+      data.scriptVersion = payload.version || '';
       data.lastSync = new Date().toISOString().slice(0, 16).replace('T', ' ');
       save(STORAGE.data, data);
     }
@@ -451,12 +509,22 @@ if (typeof document !== 'undefined') {
       ui.syncing = true;
       ui.lastError = '';
       render();
+      // The connection is fixed for this sync, and a reply is dropped if the app was cleared
+      // or reconnected meanwhile. Only the logging tab sends rows; a watching tab reads.
+      var conn = { url: settings.url, token: settings.token };
+      var gen = generation;
+      var live = function () { return gen === generation; };
       var applied = false;
       var step = function () {
-        if (!queue.length) return applied ? Promise.resolve() : apiGet().then(check).then(applyPayload);
+        if (!queue.length || !hasLock) {
+          return applied ? Promise.resolve() : apiGet(conn).then(check).then(function (payload) { if (live()) applyPayload(payload); });
+        }
         var batch = queue[0];
-        return apiPost(batch).then(check).then(function (payload) {
-          queue.shift();
+        return apiPost(conn, batch).then(check).then(function (payload) {
+          if (!live()) return;
+          // Acknowledged: drop this batch by ID. If the store refuses the write, the batch
+          // comes back on the next launch and the script's batch ID check appends nothing.
+          queue = removeBatch(queue, batch.batchId);
           save(STORAGE.queue, queue);
           applyPayload(payload);
           applied = true;
@@ -464,8 +532,9 @@ if (typeof document !== 'undefined') {
         });
       };
       return step()
-        .then(function () { ui.lastError = ''; })
+        .then(function () { if (live()) ui.lastError = ''; })
         .catch(function (err) {
+          if (!live()) return;
           var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
           if (offline || err instanceof TypeError) ui.lastError = 'No connection. Rows are saved on this device and will sync later.';
           else ui.lastError = (err && err.message) || 'Sync failed';
@@ -481,6 +550,13 @@ if (typeof document !== 'undefined') {
     document.querySelector('.seg-tabs').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-tab]');
       if (b) changeTab(b.dataset.tab);
+    });
+    document.querySelector('.seg-tabs').addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var i = TABS.indexOf(ui.tab) + (e.key === 'ArrowRight' ? 1 : -1);
+      if (i < 0 || i >= TABS.length) return;
+      changeTab(TABS[i]);
+      document.querySelector('.seg-tabs button[data-tab="' + TABS[i] + '"]').focus();
     });
 
     // Swipe between Log and Status: horizontal movement must dominate. The switch is
@@ -514,8 +590,12 @@ if (typeof document !== 'undefined') {
       renderLog();
     });
 
-    $('date').addEventListener('input', function () { $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date'; });
-    $('date').addEventListener('change', function () { $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date'; });
+    function dateChanged() {
+      ui.dateTouched = true;
+      $('date-display').textContent = formatDisplayDate($('date').value) || 'Pick a date';
+    }
+    $('date').addEventListener('input', dateChanged);
+    $('date').addEventListener('change', dateChanged);
 
     $('search').addEventListener('input', function (e) {
       ui.query = e.target.value;
@@ -535,6 +615,11 @@ if (typeof document !== 'undefined') {
       if (n <= 0) delete ui.counts[id];
       else ui.counts[id] = n;
       renderLog();
+      // The list was rebuilt; keep the keyboard on the same stepper (or its + when − went away).
+      var pick = function (delta) { return $('events').querySelector('button[data-id="' + id.replace(/"/g, '\\"') + '"][data-delta="' + delta + '"]'); };
+      var again = pick(b.dataset.delta);
+      if (!again || again.disabled) again = pick('1');
+      if (again) again.focus();
     });
 
     $('save').addEventListener('click', function () {
@@ -546,8 +631,13 @@ if (typeof document !== 'undefined') {
         toast(built.error);
         return;
       }
-      queue.push({ batchId: newBatchId(), rows: built.rows });
-      save(STORAGE.queue, queue);
+      var batch = { batchId: newBatchId(), rows: built.rows };
+      queue.push(batch);
+      if (!save(STORAGE.queue, queue)) {
+        queue = removeBatch(queue, batch.batchId);
+        toast('Could not save on this device: storage is full or blocked. Your taps are still here; try again.');
+        return;
+      }
       ui.counts = {};
       if (ui.mode === 'flight') $('mission').value = '';
       render();
@@ -555,13 +645,25 @@ if (typeof document !== 'undefined') {
       sync();
     });
 
-    $('settings-btn').addEventListener('click', function () { ui.settingsOpen = true; render(); });
+    $('settings-btn').addEventListener('click', function () { ui.settingsOpen = true; fillSettingsForm(); render(); });
     $('done').addEventListener('click', function () { ui.settingsOpen = false; render(); });
 
+    /** A new web app URL is a different workbook. Pending rows belong to the current one and go first. */
+    function pendingBlocksSwitch(url) {
+      if (url === settings.url || !pendingRows(queue)) return false;
+      ui.lastError = pendingText() + ' to the current workbook. Sync them first, or clear local data.';
+      return true;
+    }
+
     $('save-settings').addEventListener('click', function () {
-      settings.url = $('url').value.trim();
+      var url = $('url').value.trim();
+      if (pendingBlocksSwitch(url)) { render(); toast(ui.lastError); return; }
+      if (url !== settings.url) generation++;
+      settings.url = url;
       settings.token = $('token').value.trim();
       save(STORAGE.settings, settings);
+      ui.lastError = '';
+      fillSettingsForm();
       toast('Settings saved');
       sync();
     });
@@ -581,13 +683,15 @@ if (typeof document !== 'undefined') {
         ? 'This deletes ' + pending + ' unsynced ' + (pending === 1 ? 'row' : 'rows') + ', the saved summary, and the URL and token on this device. The workbook is untouched. Continue?'
         : 'This deletes the saved summary and the URL and token on this device. The workbook is untouched. Continue?';
       if (!window.confirm(msg)) return;
-      Object.keys(STORAGE).forEach(function (k) { try { localStorage.removeItem(STORAGE[k]); } catch (err) { /* ignore */ } });
+      generation++;
+      ['settings', 'data', 'queue'].forEach(function (k) { try { localStorage.removeItem(STORAGE[k]); } catch (err) { /* ignore */ } });
       settings = { url: '', token: '', theme: settings.theme };
       save(STORAGE.settings, settings);
       data = { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' };
       queue = [];
       ui.counts = {};
       ui.lastError = '';
+      fillSettingsForm();
       render();
       toast('Local data cleared');
     });
@@ -595,7 +699,12 @@ if (typeof document !== 'undefined') {
     window.addEventListener('online', function () { sync(); });
     window.addEventListener('offline', render);
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible' && pendingRows(queue)) sync();
+      if (document.visibilityState !== 'visible') return;
+      claimLock();
+      // A new Zulu day: an untouched date field moves on, and a summary from yesterday is refreshed.
+      var today = todayUtc();
+      if (!ui.dateTouched && $('date').value !== today) { $('date').value = today; renderLog(); }
+      if (pendingRows(queue) || (data.asOf && data.asOf !== today)) sync();
     });
 
     // ---- handoff link from the sheet ----
@@ -603,10 +712,13 @@ if (typeof document !== 'undefined') {
     function takeHandoff() {
       var h = parseHandoff(window.location.hash);
       if (!h) return false;
+      try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (err) { /* leave the fragment */ }
+      if (pendingBlocksSwitch(h.url)) { ui.lastError += ' Then open the link again.'; ui.settingsOpen = true; fillSettingsForm(); return false; }
+      if (h.url !== settings.url) generation++;
       settings.url = h.url;
       settings.token = h.token;
       save(STORAGE.settings, settings);
-      try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (err) { /* leave the fragment */ }
+      fillSettingsForm();
       ui.settingsOpen = false;
       ui.lastError = '';
       return true;
@@ -623,8 +735,10 @@ if (typeof document !== 'undefined') {
 
     applyTheme();
     $('date').value = todayUtc();
+    fillSettingsForm();
     var handedOff = takeHandoff();
     if (!settings.url || !settings.token) ui.settingsOpen = true;
+    claimLock();
     render();
     if (handedOff) toast('Connected to the workbook');
     if (settings.url && settings.token) sync();
@@ -649,6 +763,8 @@ if (typeof module !== 'undefined' && module.exports) {
     groupEvents: groupEvents,
     buildRows: buildRows,
     pendingRows: pendingRows,
+    removeBatch: removeBatch,
+    lockState: lockState,
     parseHandoff: parseHandoff,
     newBatchId: newBatchId,
     volumeText: volumeText

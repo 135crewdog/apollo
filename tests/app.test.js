@@ -135,3 +135,30 @@ test('volumeText', () => {
   assert.equal(app.volumeText({ 'Volume Accomplished': 2, 'Volume Required': 4, 'Percent Complete': 0.5, 'Remaining Sim Credit': 1 }), '2 of 4 this FY, 50% complete, 1 sim credit available');
   assert.equal(app.volumeText({ 'Volume Accomplished': 4, 'Volume Required': 4, 'Percent Complete': 1, 'Remaining Sim Credit': 0 }), '4 of 4 this FY, 100% complete');
 });
+
+test('buildRows refuses a mission number that starts with =', () => {
+  const events = [{ id: 'F1' }];
+  assert.match(app.buildRows('flight', '=1+1', '2026-10-07', { F1: 1 }, events).error, /cannot start with =/);
+  assert.match(app.buildRows('flight', ' =SUM(A1)', '2026-10-07', { F1: 1 }, events).error, /cannot start with =/);
+  assert.equal(app.buildRows('flight', '1E5', '2026-10-07', { F1: 1 }, events).error, undefined);
+  assert.equal(app.buildRows('ground', '=x', '2026-10-07', { F1: 1 }, events).error, undefined, 'mission ignored outside Flight');
+});
+
+test('removeBatch drops the acknowledged batch by ID and leaves the rest in order', () => {
+  const queue = [{ batchId: 'a', rows: [1] }, { batchId: 'b', rows: [2] }, { batchId: 'c', rows: [3] }];
+  assert.deepEqual(app.removeBatch(queue, 'b').map((b) => b.batchId), ['a', 'c']);
+  assert.deepEqual(app.removeBatch(queue, 'zzz').map((b) => b.batchId), ['a', 'b', 'c']);
+  assert.deepEqual(app.removeBatch([], 'a'), []);
+  assert.equal(queue.length, 3, 'input untouched');
+});
+
+test('lockState: mine, other while the heartbeat is fresh, free once it is stale or missing', () => {
+  const ttl = 10000;
+  assert.equal(app.lockState(null, 'me', 1000, ttl), 'free');
+  assert.equal(app.lockState({}, 'me', 1000, ttl), 'free');
+  assert.equal(app.lockState({ id: 'me', at: 1000 }, 'me', 1000, ttl), 'mine');
+  assert.equal(app.lockState({ id: 'me', at: 1000 }, 'me', 999999, ttl), 'mine');
+  assert.equal(app.lockState({ id: 'you', at: 1000 }, 'me', 10999, ttl), 'other');
+  assert.equal(app.lockState({ id: 'you', at: 1000 }, 'me', 11000, ttl), 'free');
+  assert.equal(app.lockState({ id: 'you', at: 'soon' }, 'me', 1000, ttl), 'free');
+});

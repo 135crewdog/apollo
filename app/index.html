@@ -21,20 +21,21 @@
     </header>
     <div class="seg-wrap">
       <div class="seg-tabs" role="tablist" aria-label="Screens">
-        <button type="button" role="tab" data-tab="log">Log</button>
-        <button type="button" role="tab" data-tab="status">Status</button>
+        <button type="button" role="tab" data-tab="log" aria-controls="screen-log">Log</button>
+        <button type="button" role="tab" data-tab="status" aria-controls="screen-status">Status</button>
       </div>
     </div>
     <div id="panels">
 
-        <section id="screen-log" class="panel" aria-label="Log">
+        <section id="screen-log" class="panel" role="tabpanel" aria-label="Log">
+          <div id="lock-notice"></div>
           <div class="section">
             <div class="section-title">Kind</div>
             <div class="card">
               <div class="toggle-group" role="group" aria-label="Kind of training">
-                <button type="button" data-mode="flight">Flight</button>
-                <button type="button" data-mode="sim">Sim</button>
-                <button type="button" data-mode="ground">Ground</button>
+                <button type="button" data-mode="flight" aria-pressed="true">Flight</button>
+                <button type="button" data-mode="sim" aria-pressed="false">Sim</button>
+                <button type="button" data-mode="ground" aria-pressed="false">Ground</button>
               </div>
             </div>
           </div>
@@ -64,7 +65,7 @@
           </div>
         </section>
 
-        <section id="screen-status" class="panel" aria-label="Status">
+        <section id="screen-status" class="panel" role="tabpanel" aria-label="Status">
           <div id="status-head" class="section-title"></div>
           <div id="logcheck"></div>
           <div id="status-error"></div>
