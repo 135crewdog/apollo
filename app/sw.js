@@ -1,7 +1,7 @@
 /* Apollo service worker: caches the app shell so the app opens offline.
  * Bump VERSION on every change to any file in app/, or devices keep the old copy.
  * API calls go to another origin and are never intercepted. */
-var VERSION = 'apollo-2026.10.10.1';
+var VERSION = 'apollo-2026.10.10.2';
 var SHELL = ['./', './index.html', './app.js', './style.css', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function (event) {
@@ -11,7 +11,8 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
-      return Promise.all(keys.filter(function (k) { return k !== VERSION; }).map(function (k) { return caches.delete(k); }));
+      // Only Apollo's own old caches. Cache storage is shared by every app on this origin.
+      return Promise.all(keys.filter(function (k) { return k.indexOf('apollo-') === 0 && k !== VERSION; }).map(function (k) { return caches.delete(k); }));
     }).then(function () { return self.clients.claim(); })
   );
 });
@@ -32,7 +33,11 @@ self.addEventListener('fetch', function (event) {
       }).catch(function () {
         return cache.match(req, { ignoreSearch: true }).then(function (cached) {
           if (cached || req.mode !== 'navigate') return cached;
-          return cache.match('./');
+          // Only the app's own address falls back to the app shell. Any other page that was
+          // never cached (the guide on a first offline visit) says so instead of becoming the app.
+          var scopePath = new URL(self.registration.scope).pathname;
+          if (url.pathname === scopePath || url.pathname === scopePath + 'index.html') return cache.match('./');
+          return new Response('Offline. This page has not been saved on this device yet; open it again with a connection.', { status: 503, headers: { 'Content-Type': 'text/plain' } });
         });
       });
     })
