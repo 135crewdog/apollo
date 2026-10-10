@@ -260,6 +260,16 @@ function normalizeId(id) {
   return String(id == null ? '' : id).trim().toUpperCase();
 }
 
+/**
+ * Whether a log row counts for its event: every ground row does; a flying row does
+ * unless it is a SIM row and the event gives no sim credit. The summary and the log
+ * check share this one rule.
+ */
+function rowCounts(event, mission) {
+  if (event.type !== 'flying') return true;
+  return rowKind(mission) !== 'sim' || parsePercent(event.percentCreditInSim) > 0;
+}
+
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
@@ -288,10 +298,8 @@ function summarizeEvent(event, rows, today) {
 
   for (var i = 0; i < rows.length; i++) {
     var date = parseDate(rows[i].date);
-    if (!date) continue;
-    // Every ground row counts. A flying row counts unless it is a SIM row at 0%.
+    if (!date || !rowCounts(event, rows[i].mission)) continue;
     var kind = isFlying ? rowKind(rows[i].mission) : 'ground';
-    if (kind === 'sim' && pct <= 0) continue;
     var dateStr = formatDate(date);
     var override = parseDate(rows[i].dueOverride);
     if (dateStr > last) {
@@ -388,15 +396,17 @@ function buildSummary(ground, flying, log, today) {
  */
 function checkLog(log, ground, flying, today) {
   var known = {};
-  var events = ground.concat(flying);
-  for (var e = 0; e < events.length; e++) known[normalizeId(events[e].id)] = true;
-  // The earliest Due Date Override among rows of one event on one date is the one the
-  // summary uses; the others are reported.
+  var e;
+  for (e = 0; e < ground.length; e++) known[normalizeId(ground[e].id)] = Object.assign({ type: 'ground' }, ground[e]);
+  for (e = 0; e < flying.length; e++) known[normalizeId(flying[e].id)] = Object.assign({ type: 'flying' }, flying[e]);
+  // The earliest Due Date Override among the counting rows of one event on one date is
+  // the one the summary uses; the others are reported.
   var earliest = {};
   for (var k = 0; k < log.length; k++) {
+    var kEvent = known[normalizeId(log[k].id)];
     var kDate = parseDate(log[k].date);
     var kOverride = parseDate(log[k].dueOverride);
-    if (!kDate || !kOverride) continue;
+    if (!kEvent || !kDate || !kOverride || !rowCounts(kEvent, log[k].mission)) continue;
     var key = normalizeId(log[k].id) + '|' + formatDate(kDate);
     var value = formatDate(kOverride);
     if (!(key in earliest) || value < earliest[key]) earliest[key] = value;
@@ -445,6 +455,7 @@ if (typeof module !== 'undefined' && module.exports) {
     DUE_BANDS: DUE_BANDS,
     dueBand: dueBand,
     rowKind: rowKind,
+    rowCounts: rowCounts,
     parsePercent: parsePercent,
     parseVolume: parseVolume,
     summarizeEvent: summarizeEvent,

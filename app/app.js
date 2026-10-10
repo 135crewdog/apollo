@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.10.6';
+var APP_VERSION = '2026.10.10.7';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
 /** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
 var LOCK_TTL_MS = 10000;
@@ -250,6 +250,14 @@ if (typeof document !== 'undefined') {
       if (e.key === STORAGE.lock) claimLock();
       // The logging tab wrote the queue; a watching tab shows its count.
       if (e.key === STORAGE.queue && !hasLock) { queue = load(STORAGE.queue, []); render(); }
+      // Another tab saved the connection or the theme: this tab follows, and a sync in flight is superseded.
+      if (e.key === STORAGE.settings) {
+        settings = load(STORAGE.settings, settings);
+        generation++;
+        applyTheme();
+        if (!ui.settingsOpen) fillSettingsForm();
+        render();
+      }
     });
 
     // ---- theme ----
@@ -542,6 +550,8 @@ if (typeof document !== 'undefined') {
         .then(function () {
           ui.syncing = false;
           render();
+          // The connection changed while this sync ran: run once more with the new one.
+          if (!live()) sync();
         });
     }
 
@@ -658,9 +668,10 @@ if (typeof document !== 'undefined') {
     $('save-settings').addEventListener('click', function () {
       var url = $('url').value.trim();
       if (pendingBlocksSwitch(url)) { render(); toast(ui.lastError); return; }
-      if (url !== settings.url) generation++;
+      var token = $('token').value.trim();
+      if (url !== settings.url || token !== settings.token) generation++;
       settings.url = url;
-      settings.token = $('token').value.trim();
+      settings.token = token;
       save(STORAGE.settings, settings);
       ui.lastError = '';
       fillSettingsForm();
@@ -714,7 +725,7 @@ if (typeof document !== 'undefined') {
       if (!h) return false;
       try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (err) { /* leave the fragment */ }
       if (pendingBlocksSwitch(h.url)) { ui.lastError += ' Then open the link again.'; ui.settingsOpen = true; fillSettingsForm(); return false; }
-      if (h.url !== settings.url) generation++;
+      if (h.url !== settings.url || h.token !== settings.token) generation++;
       settings.url = h.url;
       settings.token = h.token;
       save(STORAGE.settings, settings);

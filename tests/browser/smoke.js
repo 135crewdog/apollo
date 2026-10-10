@@ -216,6 +216,22 @@ async function main() {
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
+    // A connection saved in the watching tab reaches the logging tab.
+    await tab2.click('#settings-btn');
+    await tab2.fill('#token', 'abc123');
+    await tab2.selectOption('#theme', 'dark');
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark');
+    await tab2.selectOption('#theme', 'light');
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light');
+    await tab2.fill('#token', 'wrong');
+    await tab2.click('#save-settings');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('apollo.settings')).token === 'wrong');
+    await page.click('#settings-btn');
+    assert.equal(await page.inputValue('#token'), 'wrong', 'the other tab\'s token reached this tab');
+    await page.fill('#token', 'abc123');
+    await page.click('#save-settings');
+    await page.waitForFunction(() => document.getElementById('sync-status').textContent.startsWith('Last sync'));
+    await page.click('#done');
     await tab2.close();
     // The first tab holds on; a new tab after the close gets the lock only if the first is gone.
     await page.reload();
