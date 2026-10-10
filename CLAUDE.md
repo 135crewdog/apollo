@@ -207,7 +207,7 @@ app/                      the PWA: index.html, app.js, style.css, sw.js, manifes
 app/guide/                the setup guide page; loads the script code live from the repository
 tests/*.test.js           node --test: rules.test.js, app.test.js (the app's pure helpers), code.test.js (Code.js against an in-memory workbook that counts reads and writes)
 tests/browser/            smoke.js drives the app in Chromium against mock-api.js; needs Playwright, dev only
-.github/workflows/        test.yml runs node --test; pages.yml publishes app/ to GitHub Pages from main
+.github/workflows/        test.yml runs node --test and the browser smoke test; pages.yml runs it, then publishes app/ to GitHub Pages from main
 ```
 
 - **One implementation of the rules.** The script computes the summary. The app does no currency or volume math; it displays the summary the script returns.
