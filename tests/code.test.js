@@ -14,6 +14,14 @@ const vm = require('node:vm');
 const RULES = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'rules.js'), 'utf8');
 const CODE = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.js'), 'utf8');
 
+/** The script's clock stands still at noon Zulu on this day, so no expectation here depends on when the tests run. */
+const TODAY = '2026-10-05';
+class FrozenDate extends Date {
+  constructor(...args) { super(...(args.length ? args : [TODAY + 'T12:00:00Z'])); }
+  static now() { return new Date(TODAY + 'T12:00:00Z').getTime(); }
+  static [Symbol.hasInstance](v) { return v instanceof Date; }
+}
+
 /** One tab: a 2-D array of cell values plus a record of what the script did to it. */
 class Sheet {
   constructor(book, name, data) { this.book = book; this.name = name; this.data = data; this.formats = {}; this.frozen = 0; this.rules = []; this.filter = null; this.maxRows = 50; this.maxCols = 26; }
@@ -79,7 +87,7 @@ function makeWorkbook(opts = {}) {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => book.props[k] ?? null, setProperty: (k, v) => { book.props[k] = v; } }) },
     LockService: { getScriptLock: () => ({ waitLock() { book.lockLog.push('acquire'); }, releaseLock() { book.lockLog.push('release'); } }) },
     ContentService: { createTextOutput: (t) => ({ setMimeType: () => JSON.parse(t) }), MimeType: { JSON: 'json' } },
-    Array, JSON, Math, String, Number, Date, Error, Object, isNaN, isFinite, RegExp,
+    Array, JSON, Math, String, Number, Date: FrozenDate, Error, Object, isNaN, isFinite, RegExp,
   };
   vm.createContext(ctx);
   vm.runInContext(RULES, ctx);
@@ -104,7 +112,7 @@ test('GET: no token property, bad token, then a payload with parsed config and b
   assert.equal(r.ok, true);
   assert.equal(r.version, book.fn.SCRIPT_VERSION);
   assert.match(r.version, /^\d{4}\.\d{2}\.\d{2}\.\d+$/);
-  assert.match(r.asOf, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(r.asOf, TODAY, 'today is the frozen Zulu date');
   assert.deepEqual(r.ground, [{ id: 'G1', name: 'CBT thing', frequency: 'Annual' }, { id: 'G2', name: 'Egress', frequency: 'Fortnightly' }]);
   assert.deepEqual(r.flying, [
     { id: 'F1', name: 'Landing', currency: 'Semi-Annual', volumeRequired: 4, percentCreditInSim: 0.5 },
@@ -220,13 +228,14 @@ test('onEdit: a missing config column surfaces as a toast, and the log check rea
   assert.match(book.toasts.at(-1).msg, /missing the column "Frequency"/);
   assert.equal(book.toasts.at(-1).title, 'Apollo refresh failed');
   book.sheets['Ground Training Config'].data[0][2] = 'Frequency';
-  book.log().push(['F1', '2026-10-04', 'Simulator', ''], ['NOPE', '2026-10-04', '', ''], ['G1', '2026-10-04', '', 'soon']);
+  book.log().push(['F1', '2026-10-04', 'Simulator', ''], ['NOPE', '2026-10-04', '', ''], ['G1', '2026-10-04', '', 'soon'], ['G1', '2026-10-06', '', ''], ['G1', TODAY, '', '']);
   book.fn.onEdit({ range: { getSheet: () => book.sheets['Training Log'] } });
-  assert.match(book.toasts.at(-1).msg, /^3 log rows need attention/);
+  assert.match(book.toasts.at(-1).msg, /^4 log rows need attention/);
   assert.deepEqual(book.api.get('secret').logCheck.map((p) => [p.row, p.problem]), [
     [2, 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row'],
     [3, 'Training ID not in either config tab, row ignored'],
     [4, 'Due Date Override is not a date, override ignored'],
+    [5, 'date is after today, row still counted'],
   ]);
   book.toasts.length = 0;
   book.fn.onEdit({ range: { getSheet: () => ({ getName: () => 'Some other tab' }) } });
