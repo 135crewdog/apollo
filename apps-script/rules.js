@@ -24,12 +24,15 @@ var SUMMARY_HEADERS = [
 
 var CHECK_LABEL = 'CHECK LABEL';
 
+/** An interval longer than this is a typo, not a requirement: the label shows CHECK LABEL. */
+var MAX_INTERVAL_YEARS = 100;
+
 // ---------------------------------------------------------------------------
 // Date arithmetic on {y, m, d}
 // ---------------------------------------------------------------------------
 
 function parseDate(str) {
-  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str || '').trim());
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(str == null ? '' : str).trim());
   if (!m) return null;
   var y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
   if (mo < 1 || mo > 12 || d < 1 || d > daysInMonth(y, mo)) return null;
@@ -142,13 +145,13 @@ function classifyLabel(label) {
   if (s === 'biennial') return { kind: 'fy', n: 2 };
   if (s === 'triennial') return { kind: 'fy', n: 3 };
   if (s === 'pcs' || s === 'as required' || s === 'n/a') return { kind: 'none' };
-  var m = /^(\d+) ?years?$/.exec(s);
-  if (m) return { kind: 'fy', n: Number(m[1]) };
-  m = /^(\d+) ?months?$/.exec(s);
-  if (m) return { kind: 'months', n: Number(m[1]) };
-  m = /^(\d+) ?days?$/.exec(s);
-  if (m) return { kind: 'days', n: Number(m[1]) };
-  return { kind: 'unknown' };
+  var m = /^(\d+) ?(years?|months?|days?)$/.exec(s);
+  if (!m) return { kind: 'unknown' };
+  var n = Number(m[1]);
+  var unit = m[2].charAt(0);
+  var perYear = unit === 'y' ? 1 : unit === 'm' ? 12 : 365;
+  if (n > MAX_INTERVAL_YEARS * perYear) return { kind: 'unknown' };
+  return { kind: unit === 'y' ? 'fy' : unit === 'm' ? 'months' : 'days', n: n };
 }
 
 /** True when the label is one that yields a due date. */
@@ -234,21 +237,22 @@ function parsePercent(value) {
   if (s === '') return 0;
   var isPercent = /%$/.test(s);
   var n = Number(s.replace(/%$/, '').trim());
-  if (isNaN(n)) return 0;
-  if (isPercent) return n / 100;
-  return normalizePercent(n);
+  if (!isFinite(n) || n <= 0) return 0;
+  return isPercent ? Math.min(1, n / 100) : normalizePercent(n);
 }
 
+/** A fraction 0..1. A bare value above 1 is a percentage; anything above 100% is 100%. */
 function normalizePercent(n) {
-  if (isNaN(n) || n <= 0) return 0;
-  return n > 1 ? n / 100 : n;
+  if (!isFinite(n) || n <= 0) return 0;
+  if (n > 1) n = n / 100;
+  return Math.min(1, n);
 }
 
 /** Volume Required as a positive number, or null when there is nothing to count (blank, 'X', ...). */
 function parseVolume(value) {
   if (value == null || value === '') return null;
   var n = typeof value === 'number' ? value : Number(String(value).trim());
-  if (isNaN(n) || n <= 0) return null;
+  if (!isFinite(n) || n <= 0) return null;
   return n;
 }
 
@@ -294,7 +298,10 @@ function summarizeEvent(event, rows, today) {
       last = dateStr;
       lastOverride = override ? formatDate(override) : '';
     } else if (dateStr === last && override) {
-      lastOverride = formatDate(override);
+      // Two rows on the same date with different overrides: the earliest wins, whatever
+      // the order in the log. The log check reports the other.
+      var o = formatDate(override);
+      if (!lastOverride || o < lastOverride) lastOverride = o;
     }
     if (isFlying && thisFy !== null && fiscalYear(date) === thisFy) {
       if (kind === 'sim') simThisFy++;
@@ -331,7 +338,8 @@ function summarizeEvent(event, rows, today) {
     return row;
   }
 
-  var cap = Math.floor(required * pct);
+  // 100 x 0.29 is 28.999999999999996 in floating point; the tolerance keeps 29.
+  var cap = Math.floor(required * pct + 1e-9);
   var accomplished = aircraftThisFy + Math.min(simThisFy, cap);
   row['Volume Accomplished'] = accomplished;
   row['Volume Required'] = required;
@@ -374,12 +382,25 @@ function buildSummary(ground, flying, log, today) {
  * Returns [{ row, mission, date, id, problem }], one problem per row, worst first
  * (log rows may carry dueOverride, the Due Date Override cell):
  * a blank or unknown Training ID or an unreadable date means the row was ignored;
- * a future date or a SIM-looking Mission Number means the row was counted but is suspect.
+ * a future date or a SIM-looking Mission Number means the row was counted but is suspect;
+ * an override that is unreadable, beaten by an earlier one on the same date, or before
+ * the row's own date is reported as such.
  */
 function checkLog(log, ground, flying, today) {
   var known = {};
   var events = ground.concat(flying);
   for (var e = 0; e < events.length; e++) known[normalizeId(events[e].id)] = true;
+  // The earliest Due Date Override among rows of one event on one date is the one the
+  // summary uses; the others are reported.
+  var earliest = {};
+  for (var k = 0; k < log.length; k++) {
+    var kDate = parseDate(log[k].date);
+    var kOverride = parseDate(log[k].dueOverride);
+    if (!kDate || !kOverride) continue;
+    var key = normalizeId(log[k].id) + '|' + formatDate(kDate);
+    var value = formatDate(kOverride);
+    if (!(key in earliest) || value < earliest[key]) earliest[key] = value;
+  }
   var out = [];
   for (var i = 0; i < log.length; i++) {
     var entry = log[i];
@@ -395,6 +416,7 @@ function checkLog(log, ground, flying, today) {
     else if (today && formatDate(date) > today) problem = 'date is after today, row still counted';
     else if (rowKind(mission) === 'aircraft' && /^sim/i.test(mission)) problem = 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row';
     else if (overrideText !== '' && !override) problem = 'Due Date Override is not a date, override ignored';
+    else if (override && formatDate(override) > earliest[id + '|' + formatDate(date)]) problem = 'another row on the same Date has an earlier Due Date Override, this one ignored';
     else if (override && formatDate(override) < formatDate(date)) problem = 'Due Date Override is before the row\'s Date, override still used';
     if (problem) out.push({ row: entry.row, mission: entry.mission, date: entry.date, id: entry.id, problem: problem });
   }

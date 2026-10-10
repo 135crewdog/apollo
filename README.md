@@ -20,7 +20,7 @@ node tests/browser/smoke.js ./shots    # same, and saves a screenshot of each sc
 
 ## Changing the script
 
-`rules.js` holds every rule and is unit-tested in Node; `Code.js` only moves data between the sheet, the rules and the API. After a change, every workbook takes it the same way: paste the current files over `Code.gs` and `rules.gs` in Extensions → Apps Script, save, then **Deploy → Manage deployments → pencil → Version: New version → Deploy**. Without the new version the sheet's triggers run the new code while the web app URL keeps serving the old one. The URL and token do not change.
+`rules.js` holds every rule and is unit-tested in Node; `Code.js` only moves data between the sheet, the rules and the API. After a change, bump `SCRIPT_VERSION` in `Code.js`; every workbook takes it the same way: paste the current files over `Code.gs` and `rules.gs` in Extensions → Apps Script, save, then **Deploy → Manage deployments → pencil → Version: New version → Deploy**. Without the new version the sheet's triggers run the new code while the web app URL keeps serving the old one. The URL and token do not change.
 
 ## Check the web app from a browser
 

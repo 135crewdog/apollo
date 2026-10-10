@@ -435,11 +435,80 @@ test('checkLog: Due Date Override problems come after the row problems', () => {
     { row: 5, mission: '', date: '2026-03-13', id: 'G1', dueOverride: '2026-03-13' },
     { row: 6, mission: '', date: 'bad', id: 'G1', dueOverride: 'June' },
   ];
+  // Rows 2, 4 and 5 share a date: the earliest override (row 4) wins and the others are reported.
   assert.deepEqual(rules.checkLog(log, ground, [], TODAY).map((p) => [p.row, p.problem]), [
+    [2, 'another row on the same Date has an earlier Due Date Override, this one ignored'],
     [3, 'Due Date Override is not a date, override ignored'],
     [4, "Due Date Override is before the row's Date, override still used"],
+    [5, 'another row on the same Date has an earlier Due Date Override, this one ignored'],
     [6, 'date is blank or not a date, row ignored'],
   ]);
+});
+
+test('Due Date Override: two rows on the same date, the earliest override wins whatever the order', () => {
+  const event = { id: 'G1', name: 'g', type: 'ground', label: 'Annual' };
+  const rows = [
+    { mission: '', date: '2026-03-01', id: 'G1', dueOverride: '2027-06-30' },
+    { mission: '', date: '2026-03-01', id: 'G1', dueOverride: '2027-03-31' },
+    { mission: '', date: '2026-03-01', id: 'G1' },
+  ];
+  assert.equal(rules.summarizeEvent(event, rows, TODAY)['Due Date'], '2027-03-31');
+  assert.equal(rules.summarizeEvent(event, rows.slice().reverse(), TODAY)['Due Date'], '2027-03-31');
+  // The same override twice is no conflict; a different event or date is not compared.
+  const log = [
+    { row: 2, mission: '', date: '2026-03-01', id: 'G1', dueOverride: '2027-06-30' },
+    { row: 3, mission: '', date: '2026-03-01', id: 'g1 ', dueOverride: '2027-06-30' },
+    { row: 4, mission: '', date: '2026-03-02', id: 'G1', dueOverride: '2027-01-31' },
+    { row: 5, mission: '', date: '2026-03-01', id: 'G2', dueOverride: '2027-01-31' },
+    { row: 6, mission: '', date: '2026-03-01', id: 'G1', dueOverride: '2027-05-31' },
+  ];
+  const ground = [{ id: 'G1', name: 'g', label: 'Annual' }, { id: 'G2', name: 'g', label: 'Annual' }];
+  assert.deepEqual(rules.checkLog(log, ground, [], TODAY).map((p) => p.row), [2, 3]);
+});
+
+test('volume cap: a percentage that lands just under an integer in floating point is not floored away', () => {
+  // 100 x 0.29 = 28.999999999999996
+  const rows = [];
+  for (let i = 0; i < 40; i++) rows.push({ mission: 'SIM', date: '2026-10-01', id: 'F1' });
+  const row = rules.summarizeEvent(flyingEvent(100, 0.29), rows, TODAY);
+  assert.equal(row['Volume Accomplished'], 29);
+  assert.equal(row['Remaining Sim Credit'], 0);
+  // A true half still floors: 5 x 50% is 2.
+  assert.equal(rules.summarizeEvent(flyingEvent(5, 0.5), rows, TODAY)['Volume Accomplished'], 2);
+  assert.equal(rules.summarizeEvent(flyingEvent(7, '29%'), rows, TODAY)['Volume Accomplished'], 2, '7 x 0.29 = 2.03');
+});
+
+test('config values outside sense: negative or infinite percent and volume', () => {
+  assert.equal(rules.parsePercent(-0.5), 0);
+  assert.equal(rules.parsePercent('-50%'), 0);
+  assert.equal(rules.parsePercent(150), 1);
+  assert.equal(rules.parsePercent('150%'), 1);
+  assert.equal(rules.parsePercent(1.5), 0.015, 'a bare value above 1 is a percentage, as the spec says');
+  assert.equal(rules.parsePercent(Infinity), 0);
+  assert.equal(rules.parsePercent('Infinity'), 0);
+  assert.equal(rules.parsePercent(NaN), 0);
+  assert.equal(rules.parseVolume(Infinity), null);
+  assert.equal(rules.parseVolume('Infinity'), null);
+  assert.equal(rules.parseVolume(-4), null);
+  assert.equal(rules.parseVolume(NaN), null);
+  // A -50% sim credit counts no SIM rows and never goes negative.
+  const rows = rowsThisFy(2, 0);
+  const row = rules.summarizeEvent(flyingEvent(4, -0.5), rows, TODAY);
+  assert.equal(row['Volume Accomplished'], 0);
+  assert.equal(row['Percent Complete'], 0);
+  assert.equal(row['Remaining Sim Credit'], 0);
+  assert.equal(row['Last Accomplished'], '');
+});
+
+test('labels: an interval beyond 100 years is CHECK LABEL', () => {
+  assert.equal(rules.dueDate('100 Years', '2026-01-01'), '2126-09-30');
+  assert.equal(rules.dueDate('101 Years', '2026-01-01'), rules.CHECK_LABEL);
+  assert.equal(rules.dueDate('1200 Months', '2026-01-01'), '2126-01-31');
+  assert.equal(rules.dueDate('1201 Months', '2026-01-01'), rules.CHECK_LABEL);
+  assert.equal(rules.dueDate('36500 Days', '2026-01-01'), '2125-12-31');
+  assert.equal(rules.dueDate('36501 Days', '2026-01-01'), rules.CHECK_LABEL);
+  assert.equal(rules.dueDate('99999999999999999999 Days', '2026-01-01'), rules.CHECK_LABEL);
+  assert.equal(rules.labelProducesDueDates('101 Years'), false);
 });
 
 test('checkLog: reports ignored and suspect rows with the sheet row number, worst problem first', () => {
