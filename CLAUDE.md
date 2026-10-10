@@ -4,7 +4,7 @@ Personal KC-135 aircrew training tracker. A PWA on any device logs training even
 
 ## The three project rules
 
-1. **SIMPLE.** The log is three columns, one accomplishment per row. Plain HTML/CSS/JS, no framework, no build step, no runtime dependencies. When in doubt, choose fewer columns, files and features.
+1. **SIMPLE.** The log is three columns the app writes, plus one hand-entered override, one accomplishment per row. Plain HTML/CSS/JS, no framework, no build step, no runtime dependencies. When in doubt, choose fewer columns, files and features.
 2. **FUTURE-PROOF.** Everything the app knows about training requirements comes from the two config tabs. Aircrew will edit those tabs for years, in the RTM's own plain words. An RTM change must never need a code change. Never hardcode a Task ID, a task name, or behavior for one specific event.
 3. **ZULU.** Every date and time in the log, the summary, the API and the app is Zulu (UTC). No exceptions. "Today" is the UTC date, never the device's or the spreadsheet's local date. A sortie is logged on its Zulu date.
 
@@ -18,7 +18,7 @@ Ask the user before adding anything that is not in this file. Ideas that were di
 |---|---|---|
 | 1 | `apps-script/rules.js`, `apps-script/Code.js`, `tests/`, `README.md`. Installed in the user's workbook and checked against test rows. | Done |
 | 2 | The PWA in `app/` as described under "The app", hosted from this repo with GitHub Pages so one hosted copy serves every user. | Done. Live at `https://135crewdog.github.io/apollo/` since the first Pages deploy on 2026-10-07 |
-| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | Done. The guide at `/guide/` is the share link; script-free template; Apollo → Connect device handoff. Google-side screen captures still to be added to the guide |
+| 3 | Sharing: a template workbook offered as a "Make a copy" link with the script, headers and RTM config already in it, and a one-tap handoff link that carries the web app URL and token into the app's Settings so nothing is typed by hand. | Done, then paused on 2026-10-09 while the app and sheet are refined for one user. The guide at `/guide/` is the share link; script-free template; Apollo → Connect device handoff. Still open: Google-side screen captures for the guide, and two template questions (non-RTM rows, two flying rows the user's workbook lacks) |
 
 ## The workbook
 
@@ -31,7 +31,7 @@ A Google Sheets workbook named "Apollo" with four tabs. Find tabs by exact name 
 | `Flying Training Config` | the user | Task ID, Task Name, Currency, Volume Required, Percent Credit in Sim |
 | `Individual Training Summary` | the script only; rewritten on every refresh | Task ID, Task Name, Last Accomplished, Due Date, Overdue, Volume Accomplished, Volume Required, Percent Complete, Remaining Sim Credit |
 
-**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab, a filter or sort included, is lost on the next refresh because the tab is cleared and rewritten. Sorting the summary by hand while a refresh runs once left eleven rows duplicated and eleven missing; the Status screen in the app is where the sorted view lives.
+**Plain ranges only, on every tab.** Do not use Format → Convert to table (a Google Sheets Table) anywhere in the workbook. A Table owns its header row and swallowed the summary once. If one appears on the summary tab the script rebuilds that tab. Colors, widths, frozen rows and number formats are fine on the three input tabs; anything set by hand on the summary tab, a filter or sort included, is lost on the next refresh. A hand sort racing a refresh once scrambled the tab; the Status screen in the app is the sorted view.
 
 ### Training Log
 
@@ -162,7 +162,7 @@ These are checked against the RTM. If the code disagrees with this table, the co
 | Overdue | `YES` if Due Date is before today (whether the label or an override set it), or if the label produces due dates and the event has never been logged. Otherwise blank. Never `YES` for `CHECK LABEL`. |
 | Volume Required | The config value if it is a number above 0. Anything else (blank, `X`) means nothing to count: this column, Percent Complete and Remaining Sim Credit are blank, and Volume Accomplished shows the plain count of rows that count this FY. |
 | Volume Accomplished | Aircraft rows this FY + SIM rows this FY, with SIM rows capped at `floor(Volume Required × Percent Credit in Sim)`. |
-| Percent Complete | `min(1, Accomplished / Required)`, stored as a fraction (0.5) and shown as a percent (50%) by the column's number format. The API returns the fraction. It was Percent Remaining until 2026-10-08; the user chose "complete" and the test table below was converted (100 − remaining). |
+| Percent Complete | `min(1, Accomplished / Required)`, stored as a fraction (0.5) and shown as a percent (50%) by the column's number format. The API returns the fraction. Was Percent Remaining until 2026-10-08; the test table was converted. |
 | Remaining Sim Credit | `max(0, min(Required − Accomplished, cap − SIM rows this FY))` |
 
 Ground rows leave all four volume columns blank.
@@ -200,12 +200,12 @@ Today is 2026-10-05 (FY27) in all of these. The tests compare the fraction, so "
 
 ```
 CLAUDE.md                 this file, the spec
-README.md                 install, token and deploy steps for the workbook script; app setup
+README.md                 for developers: tests, API, hosting, version bumps; setup lives in the guide
 apps-script/rules.js      pure functions, no Apps Script globals, unit-tested in Node
 apps-script/Code.js       sheet reading/writing, refresh, menu, doGet, doPost
 app/                      the PWA: index.html, app.js, style.css, sw.js, manifest.webmanifest, icons
 app/guide/                the setup guide page; loads the script code live from the repository
-tests/*.test.js           node --test: rules.test.js and app.test.js (the app's pure helpers)
+tests/*.test.js           node --test: rules.test.js, app.test.js (the app's pure helpers), code.test.js (Code.js against an in-memory workbook that counts reads and writes)
 tests/browser/            smoke.js drives the app in Chromium against mock-api.js; needs Playwright, dev only
 .github/workflows/        test.yml runs node --test; pages.yml publishes app/ to GitHub Pages from main
 ```
@@ -231,7 +231,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 ### The app (three screens)
 
-**An ordinary web page.** The app is a page the browser scrolls, not an app shell. The browser owns the viewport, the status bar, the home indicator, the toolbar, the keyboard and zoom; nothing in the app is sized to the viewport height or to a safe-area inset, and the page background is the app background, so there is nothing behind the app to show through on any device. (A fixed shell once showed a band of page beneath the app on an installed iOS copy; every device would have had its own version of that.) Content sits in one column, at most 720px wide, the same reading width as the guide: a portrait phone fills it, a landscape phone, an iPad or a desktop centers it. Header and tabs scroll away with the page like any web page. The one thing that sticks is the Save bar, at the bottom of the Log section, because the event list is long and Save must stay one tap away; it uses standard sticky positioning and settles into place after the list at the end of the page.
+**An ordinary web page.** The app is a page the browser scrolls, not an app shell. The browser owns the viewport, the status bar, the home indicator, the toolbar, the keyboard and zoom; nothing in the app is sized to the viewport height or to a safe-area inset, and the page background is the app background, so there is nothing behind the app to show through on any device. (A fixed shell once left a band of page showing on an installed iOS copy.) Content sits in one column, at most 720px wide, the same reading width as the guide: a portrait phone fills it, a landscape phone, an iPad or a desktop centers it. Header and tabs scroll away with the page like any web page. The one thing that sticks is the Save bar, at the bottom of the Log section, because the event list is long and Save must stay one tap away; it uses standard sticky positioning and settles into place after the list at the end of the page.
 
 **Design system.** The visual language follows the user's Show Time PWA (github.com/135crewdog/showtime), an iOS-style system: system font stack, antialiased; a white (dark: `#1c1c1e`) header with the 34px bold title on the left and a round 40px gear button on the right; an iOS segmented control under the header switching Log and Status, with a swipe doing the same (horizontal movement must dominate, 50px threshold; the switch is immediate, there is no slide); content in sections with 13px uppercase letter-spaced gray titles over rounded 10px cards with a 1px border; 17px inputs on a gray fill with 10px radius; full-width 12px-radius buttons; Settings as its own screen with "Done" on the left and a centered title; a Light/Dark/Auto theme setting that also sets the page's theme color, which colors the browser's and the installed app's status bar; Apple's gray palette for backgrounds, borders, fills and secondary text (`#f2f2f7`, `#ffffff`, `#c6c6c8`, `#8e8e93`, `#e5e5ea`; dark `#000000`, `#1c1c1e`, `#38383a`, `#98989d`, `#48484a`). Where Show Time uses iOS blue, Apollo uses the due-date palette: red `#EA9999` for primary buttons, orange `#F9CB9C` for the active kind and a picked stepper, yellow `#FFF2CC` and gray `#666666` where the bands already apply, with dark text on all of them. Every list row leads with the Task Name and puts the Task ID beneath it in gray, on Log and Status alike; search matches either. Everything the app says is sentence case (buttons, labels, hints, toasts, empty states, the version line); section titles are uppercase and letter-spaced as a visual device; proper nouns keep their capitals (Zulu, Task ID, Sim); the OVERDUE badge is a status flag drawn in capitals on purpose. Every date a human reads in the app is `DD-Mmm-YY` (`07-Oct-26`): due dates, Last Accomplished, "As of", last sync, and the date field, which shows that label over the native picker while its value stays `YYYY-MM-DD`.
 
@@ -243,7 +243,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`) and `apollo.queue` (`[{ batchId, rows }]`).
 
-**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline. Every file, page or asset, is network-first and revalidated past the browser's HTTP cache, with the cached copy as the offline fallback, so a new page and its new script always arrive together (serving assets cache-first once showed a new page with the old script, and a new field did nothing until the next launch); API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
+**Hosting and updates.** `app/` is published to GitHub Pages by `.github/workflows/pages.yml` on every push to main that touches it, at `https://135crewdog.github.io/apollo/`. `sw.js` caches the app shell so the app opens offline. Every file, page or asset, is network-first and revalidated past the browser's HTTP cache, with the cached copy as the offline fallback, so a new page and its new script always arrive together (cache-first assets once paired a new page with an old script); API calls are never intercepted. Bump `VERSION` in `sw.js` and `APP_VERSION` in `app.js` on every change to `app/`, or devices keep the old copy.
 
 ## Sharing (milestone 3)
 
