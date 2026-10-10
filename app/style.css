@@ -55,9 +55,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-/* Search fields keep the browser's own look: iPhone draws its clear button only inside it. */
-button, input:not([type="checkbox"]):not([type="search"]), select { -webkit-appearance: none; appearance: none; }
-button, input, select { font-family: inherit; }
+button, input:not([type="checkbox"]), select { -webkit-appearance: none; appearance: none; font-family: inherit; }
 input[type="checkbox"] { -webkit-appearance: checkbox; appearance: checkbox; }
 button, input, select { touch-action: manipulation; }
 
