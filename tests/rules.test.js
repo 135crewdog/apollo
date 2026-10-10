@@ -596,3 +596,26 @@ test('labels use the RTM words: abbreviations are CHECK LABEL', () => {
   assert.equal(rules.dueDate('60 mos', '2022-03-05'), rules.CHECK_LABEL);
   assert.equal(rules.dueDate('5Years', '2022-01-15'), '2027-09-30');
 });
+
+test('override conflict: a row the summary does not count takes no part (SIM at 0% credit)', () => {
+  const flying = [{ id: 'F1', name: 'f', label: 'Annual', volumeRequired: 4, percentCreditInSim: 0 }];
+  const log = [
+    { row: 2, mission: 'SIM', date: '2026-03-01', id: 'F1', dueOverride: '2027-01-31' },
+    { row: 3, mission: '0123', date: '2026-03-01', id: 'F1', dueOverride: '2027-06-30' },
+  ];
+  assert.deepEqual(rules.checkLog(log, [], flying, TODAY), [], 'the aircraft override is the one in use, so nothing to report');
+  const row = rules.buildSummary([], flying, log, TODAY)[0];
+  assert.equal(row['Due Date'], '2027-06-30');
+  // With sim credit the SIM row counts, and its earlier override wins.
+  flying[0].percentCreditInSim = 0.5;
+  assert.deepEqual(rules.checkLog(log, [], flying, TODAY).map((p) => p.row), [3]);
+  assert.equal(rules.buildSummary([], flying, log, TODAY)[0]['Due Date'], '2027-01-31');
+});
+
+test('rowCounts is the one rule the summary and the log check share', () => {
+  assert.equal(rules.rowCounts({ type: 'ground' }, 'SIM'), true);
+  assert.equal(rules.rowCounts({ type: 'flying', percentCreditInSim: 0 }, 'sim '), false);
+  assert.equal(rules.rowCounts({ type: 'flying', percentCreditInSim: 0 }, '0123'), true);
+  assert.equal(rules.rowCounts({ type: 'flying', percentCreditInSim: 0 }, ''), true, 'a blank mission on a flying event is an aircraft row');
+  assert.equal(rules.rowCounts({ type: 'flying', percentCreditInSim: '50%' }, 'SIM'), true);
+});

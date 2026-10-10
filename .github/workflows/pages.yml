@@ -17,6 +17,9 @@ jobs:
   # A deploy waits for the unit tests and the browser smoke test to pass.
   test:
     uses: ./.github/workflows/test.yml
+    # The tests need to read the repository and nothing more; the deploy keys stay with deploy.
+    permissions:
+      contents: read
   deploy:
     needs: test
     runs-on: ubuntu-latest

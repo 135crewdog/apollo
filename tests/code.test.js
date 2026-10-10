@@ -47,6 +47,7 @@ class Sheet {
     const cell = (i, j) => (s.data[i] || [])[j] ?? '';
     return {
       getLastRow() { return r + nr - 1; },
+      clearContent() { book.writes++; for (let i = 0; i < nr; i++) { if (!s.data[r - 1 + i]) continue; for (let j = 0; j < nc; j++) s.data[r - 1 + i][c - 1 + j] = ''; } while (s.data.length && s.data[s.data.length - 1].every((v) => v === '' || v == null)) s.data.pop(); },
       getValue() { book.reads++; return cell(r - 1, c - 1); },
       getValues() { book.reads++; const out = []; for (let i = 0; i < nr; i++) { const row = []; for (let j = 0; j < nc; j++) row.push(cell(r - 1 + i, c - 1 + j)); out.push(row); } return out; },
       getNumberFormat() { book.reads++; return s.formats[`${r},${c}`] || 'General'; },
@@ -166,12 +167,13 @@ test('POST writes the summary tab once and does not read the log twice', () => {
   book.api.get('secret');
   book.resetCounts();
   book.api.post({ token: 'secret', batchId: 'b1', rows: [{ mission: '', date: '2026-10-04', id: 'G1' }] });
-  assert.equal(book.reads, 9, 'log header row and last row for the append; three tabs and the log header row to compute; color rules, filter and header check to write');
+  assert.equal(book.reads, 9, 'log header row and last row for the append; three tabs and the log header row to compute; color rules (short, so no format read), filter and header check to write');
   assert.equal(book.writes, 8, 'append (format and values); format once (two formats, frozen row, colors); clear and values');
   assert.equal(book.summary()[0][0], 'Task ID');
   book.resetCounts();
   book.api.post({ token: 'secret', batchId: 'b2', rows: [{ mission: '', date: '2026-10-05', id: 'G1' }] });
-  assert.equal(book.writes, 4, 'second save: append (format and values), clear, values; formatting is not repeated');
+  assert.equal(book.reads, 10, 'second save: one more read for the last cell\'s format once the color rules reach the last row');
+  assert.equal(book.writes, 4, 'second save: append (format and values), values, clear below; formatting is not repeated');
 });
 
 test('batch ids are capped at 50', () => {
@@ -185,8 +187,10 @@ test('batch ids are capped at 50', () => {
 
 test('refresh: date cells read as calendar dates, rows ordered ground then flying, formats and colors set', () => {
   const book = makeWorkbook({ log: [['Training ID', 'Date', 'Mission Number', 'Due Date Override'], ['G1', new Date('2026-10-05T12:00:00Z'), '', new Date('2027-01-31T12:00:00Z')], ['F1', '2026-10-02', '0123', '']] });
+  book.sheets['Individual Training Summary'].data = [['stale'], [], [], [], [], [], ['stale row 7']];
   book.fn.refresh();
   const s = book.summary();
+  assert.equal(s.length, 5, 'rows below the new summary are cleared');
   assert.deepEqual(s[0], ['Task ID', 'Task Name', 'Last Accomplished', 'Due Date', 'Overdue', 'Volume Accomplished', 'Volume Required', 'Percent Complete', 'Remaining Sim Credit']);
   assert.deepEqual(s[1].slice(0, 5), ['G1', 'CBT thing', '2026-10-05', '2027-01-31', ''], 'override used');
   assert.deepEqual(s[3].slice(0, 5), ['F1', 'Landing', '2026-10-02', '2027-09-30', ''], 'Semi-Annual from Oct is due at the end of the next half');
@@ -324,17 +328,23 @@ test('formatting runs again only when the color rules stop short of the last row
   book.resetCounts();
   book.fn.refresh();
   assert.equal(formatted(), 2);
+  summary.formats['80,1'] = 'General'; // the number formats were changed by hand while the rules stayed
+  book.resetCounts();
+  book.fn.refresh();
+  assert.equal(formatted(), 6, 'formats set once more');
+  assert.equal(summary.formats['80,1'], '@');
 });
 
 test('a write failure on the summary tab is reported and the tab is kept; only a Table rebuilds it', () => {
   const book = makeWorkbook();
   const summary = book.sheets['Individual Training Summary'];
-  summary.data = [['Task ID', 'kept']];
+  summary.data = [['Task ID', 'kept'], ['old', 'row']];
   summary.failWrites = true;
   book.fn.refresh();
   assert.equal(book.toasts.at(-1).title, 'Apollo refresh failed');
   assert.match(book.toasts.at(-1).msg, /Service error/);
   assert.equal(book.sheets['Individual Training Summary'], summary, 'the tab was not deleted');
+  assert.deepEqual(book.summary(), [['Task ID', 'kept'], ['old', 'row']], 'the previous summary is still there');
   summary.failWrites = false;
   book.fn.refresh();
   assert.equal(book.toasts.at(-1).title, 'Apollo');
