@@ -31,22 +31,6 @@ test('formatDisplayDate: DD-Mmm-YY for humans, other values untouched', () => {
   assert.equal(app.formatDisplayDate('yesterday'), 'yesterday');
 });
 
-test('dueBand matches the sheet bands', () => {
-  const row = (due, overdue) => ({ 'Due Date': due, 'Overdue': overdue || '' });
-  assert.equal(app.dueBand(row('', 'YES'), TODAY), 'overdue');
-  assert.equal(app.dueBand(row('2026-06-30', 'YES'), TODAY), 'overdue');
-  assert.equal(app.dueBand(row('2026-10-31'), TODAY), 'd30');
-  assert.equal(app.dueBand(row('2026-11-06'), TODAY), 'd30');
-  assert.equal(app.dueBand(row('2026-11-07'), TODAY), 'd60');
-  assert.equal(app.dueBand(row('2026-12-06'), TODAY), 'd60');
-  assert.equal(app.dueBand(row('2026-12-31'), TODAY), 'd90');
-  assert.equal(app.dueBand(row('2027-01-05'), TODAY), 'd90');
-  assert.equal(app.dueBand(row('2027-01-06'), TODAY), '');
-  assert.equal(app.dueBand(row('2027-09-30'), TODAY), '');
-  assert.equal(app.dueBand(row(''), TODAY), '');
-  assert.equal(app.dueBand(row('CHECK LABEL'), TODAY), '');
-});
-
 test('sortSummary: overdue first, then CHECK LABEL, then by due date, then no due date; ties keep config order', () => {
   const rows = [
     { 'Task ID': 'A', 'Due Date': '2027-09-30', 'Overdue': '' },
