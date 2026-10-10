@@ -26,16 +26,18 @@ document.querySelectorAll('button[data-copy]').forEach(function (btn) {
     var target = document.getElementById(btn.dataset.copy);
     if (target.classList.contains('loading')) return;
     var text = target.textContent;
-    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 2000); };
+    // The button says Copied only once a copy has worked; otherwise it says so and the
+    // reader selects the text by hand.
+    var done = function (ok) { btn.textContent = ok ? 'Copied' : 'Copy failed, select the text'; setTimeout(function () { btn.textContent = 'Copy'; }, 3000); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
     } else {
-      fallbackCopy(text);
-      done();
+      done(fallbackCopy(text));
     }
   });
 });
 
+/** True when the copy worked. */
 function fallbackCopy(text) {
   var ta = document.createElement('textarea');
   ta.value = text;
@@ -44,6 +46,8 @@ function fallbackCopy(text) {
   ta.style.left = '-9999px';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); } catch (err) { /* nothing more to try */ }
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
   document.body.removeChild(ta);
+  return ok;
 }
