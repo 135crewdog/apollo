@@ -62,14 +62,14 @@ Four PRs, each reviewable on its own. Packages 1 and 2 are independent; 3 and 4 
 
 Changes in `app/app.js`, `app/index.html`, `app/style.css`, `app/sw.js`; version bump.
 
-- Queue discipline: every mutation re-reads `apollo.queue`, applies, writes back; acknowledgement removes by `batchId`; `storage` events refresh the in-memory copy and the pending count. Format unchanged: `[{ batchId, rows }]`.
+- One logging tab at a time: a heartbeat lock in local storage; a second tab shows a notice and does not log; stale locks expire; acknowledgement removes a batch by `batchId`. Queue format unchanged: `[{ batchId, rows }]`.
 - `save()` reports failure; Save keeps its state on failure; acknowledgement failure keeps the batch.
 - URL change refused while pending rows exist (Settings save and handoff alike); token-only change allowed; sync captures its connection at start.
 - Generation counter for Clear local data and connection changes; late replies dropped.
 - Visibility: untouched default date advances; sync when `asOf` is stale.
 - Settings inputs populated only on open, Save and Clear.
 - Focus restored to the stepper after re-render.
-- `aria-pressed` on kinds, `aria-controls` on tabs with arrow keys, `:focus-within` on the date wrapper; palette change only if owner question 5 says yes.
+- `aria-pressed` on kinds, `aria-controls` on tabs with arrow keys, `:focus-within` on the date wrapper; light-mode secondary and error text darkened to 4.5:1.
 - `buildRows` rejects a mission number starting with `=`.
 - Service worker: delete only `apollo-*` caches; shell fallback only for the app route, plain offline response otherwise.
 - Settings shows the script version from the payload when present.
@@ -90,7 +90,7 @@ Changes in `apps-script/Code.js`, `apps-script/rules.js`, `tests/code.test.js`, 
 - `validateRows` rejects a leading `=` in mission or ID.
 - Time zone read once per log read; formatting guard on the conditional rules' range.
 - `SCRIPT_VERSION` in the payload.
-- Rules: cap tolerance, percent clamp and finiteness, interval ceiling; the override conflict rule once decided.
+- Rules: cap tolerance, percent clamp and finiteness, interval ceiling; same-date override conflict resolved to the earliest and reported by the log check.
 
 Tests: the in-memory workbook gains strict bounds, a lock that records acquire and release order, failure injection on writes and on the property service, a formula-literal check, and a frozen clock. Rules tests for R1 boundaries, R2 inputs, R5 ceilings, and R4 under the agreed rule. The required RTM tables are untouched.
 
@@ -109,16 +109,16 @@ Changes in `app/guide/index.html`, `CLAUDE.md`; version bump for the guide.
 Changes in `tests/`, `.github/workflows/`.
 
 - Frozen clock in the adapter tests; rules-derived expectations in the smoke test.
-- `pages.yml` runs `node --test` before deploying; the browser smoke in CI if owner question 4 says yes.
+- `pages.yml` runs `node --test` and the browser smoke (Playwright, development only) before deploying.
 
-## 4. Owner questions
+## 4. Owner decisions (answered 2026-10-10)
 
-1. **R4, same-date override conflict.** Recommend: the earliest override wins and the log check reports the later row. The alternative is to report only and keep last-wins, which leaves the result order-dependent.
-2. **W3, workbook sharing.** The audit reports the live workbook as readable by anyone with the link. If that was for the audit, restricting it is a one-click change on your side; nothing in Apollo needs it, since the app reaches the sheet through the script. Your call; I will not change sharing.
-3. **W4, the PRORATED row (MB85YM, 2026-09-30).** If it records an authorized accomplishment, it stays as it is. If it records administrative relief, the documented path is to delete row 71 and put the authorized expiration in row 70's Due Date Override. I will not touch the row.
-4. **D6, browser smoke in CI.** Adds a development-only Playwright step and about two minutes per deploy. Recommend yes.
-5. **A8, palette.** Darken the light-mode secondary text from `#8e8e93` to about `#6d6d72` and the error text to a deeper red, to reach 4.5:1. The due-date band colors stay. Recommend yes.
-6. **A1 queue model.** Recommend the re-read discipline above with the documented residual window, not a single-tab lock and not IndexedDB.
+1. **R4, same-date override conflict:** the earliest override wins and the log check reports the later row.
+2. **W3, workbook sharing:** the owner restricts it on their side. Nothing in Apollo changes.
+3. **W4, the PRORATED row:** it stays in the log. The owner's reasoning: at the FY close-out the training office prorates unaccomplished events, here one of the two required, and logging that prorated event as a row dated 30 September with a mission note of PRORATED lets the rules do the work with no lookup and no new rule. The lead agrees: it is the general mechanism, "log what the training office credits you with, dated when they credit it", and it fits the existing rules exactly (any non-SIM mission text is an aircraft row). It goes into the guide's FAQ when milestone 3 resumes and into the spec's "Deliberately not" paragraph now, as a note rather than a rule. No special case for PRORATED anywhere in code.
+4. **D6, browser smoke in CI:** yes, as a development-only step that gates the Pages deploy.
+5. **A8, palette:** yes, darken light-mode secondary and error text to 4.5:1; the band colors stay.
+6. **A1, queue model:** one tab at a time. A tab holds a lock in local storage with a heartbeat; a second tab shows a notice and does not log until the first is closed or its lock goes stale; the lock is released on page hide. Status stays readable in the second tab. This replaces the re-read discipline in Package 1; acknowledgement by batch ID (A5) stays.
 
 ## 5. What this response does not do
 
