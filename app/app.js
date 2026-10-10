@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.10.3';
+var APP_VERSION = '2026.10.10.4';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
 /** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
 var LOCK_TTL_MS = 10000;
@@ -443,7 +443,7 @@ if (typeof document !== 'undefined') {
       var se = $('settings-error');
       se.textContent = '';
       if (ui.lastError) se.appendChild(banner('error', ui.lastError));
-      $('version').textContent = APP_VERSION + (data.scriptVersion ? ' · script v' + data.scriptVersion : '');
+      $('version').textContent = APP_VERSION + (data.scriptVersion ? ' · Script v' + data.scriptVersion : '');
     }
 
     function toast(text) {
