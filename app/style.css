@@ -48,6 +48,9 @@
    to a safe-area inset; a fixed app shell that was once here showed a band of page beneath the
    app on an installed iOS copy, and every device would have had its own version of that. */
 * { margin: 0; padding: 0; box-sizing: border-box; }
+/* The sizes in this file are the sizes on every device in every orientation. Without this,
+   Safari on iPhone enlarges some text in landscape and leaves the rest, badges included, alone. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
