@@ -20,7 +20,7 @@ var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
 /** Bump on every change to Code.js or rules.js. Returned in the API payload and shown in the app's Settings. */
-var SCRIPT_VERSION = '2026.10.10.3';
+var SCRIPT_VERSION = '2026.10.11.1';
 
 var APP_URL = 'https://135crewdog.github.io/apollo/';
 var PROP_TOKEN = 'APOLLO_TOKEN';
@@ -198,29 +198,37 @@ function writeSummary(ss, rows) {
 }
 
 /**
- * A refresh rewrites the values. The text and percent formats, the frozen header and
- * the Due Date colors are set once, on whole columns, and survive every refresh. A tab
- * whose color rules do not reach its last row (never formatted, formatted when it was
- * shorter, or grown since) or whose last cell is no longer text is formatted again, once.
+ * A refresh rewrites the values in one write: the new rows, then blanks to the last row of
+ * the grid. A write that fails leaves the previous summary; one that succeeds leaves no
+ * stale row. The text and percent formats, the frozen header and the Due Date colors are
+ * set once, on whole columns, and survive every refresh; a tab found unformatted (never
+ * formatted, formatted when it was shorter, grown since, or changed by hand) is formatted
+ * again, once.
  */
 function fillSummary(sheet, values) {
   ensureRows(sheet, values.length);
-  if (!colorRulesReachLastRow(sheet) || sheet.getRange(sheet.getMaxRows(), 1).getNumberFormat() !== '@') formatSummary(sheet);
+  if (!summaryFormatted(sheet)) formatSummary(sheet);
   // A filter or sort left on this tab by hand reorders rows under the next write.
   var filter = sheet.getFilter();
   if (filter) filter.remove();
-  // The new values go in first, then whatever lies below them is cleared, so a write that
-  // fails leaves the previous summary in place rather than an empty tab.
-  sheet.getRange(1, 1, values.length, SUMMARY_HEADERS.length).setValues(values);
-  var below = sheet.getMaxRows() - values.length;
-  if (below > 0) sheet.getRange(values.length + 1, 1, below, SUMMARY_HEADERS.length).clearContent();
+  var rows = sheet.getMaxRows();
+  var blank = SUMMARY_HEADERS.map(function () { return ''; });
+  var all = values.slice();
+  while (all.length < rows) all.push(blank);
+  sheet.getRange(1, 1, rows, SUMMARY_HEADERS.length).setValues(all);
 }
 
-function colorRulesReachLastRow(sheet) {
+/** The color rules reach the last row, and the last row carries the text and percent formats. Two reads. */
+function summaryFormatted(sheet) {
   var rules = sheet.getConditionalFormatRules();
   if (rules.length !== DUE_BANDS.length) return false;
   var ranges = rules[0].getRanges();
-  return ranges.length > 0 && ranges[0].getLastRow() >= sheet.getMaxRows();
+  if (!ranges.length || ranges[0].getLastRow() < sheet.getMaxRows()) return false;
+  var formats = sheet.getRange(sheet.getMaxRows(), 1, 1, SUMMARY_HEADERS.length).getNumberFormats()[0];
+  for (var i = 0; i <= SUMMARY_HEADERS.indexOf('Overdue'); i++) {
+    if (formats[i] !== '@') return false;
+  }
+  return formats[SUMMARY_HEADERS.indexOf('Percent Complete')] === '0%';
 }
 
 /** A write past the grid fails, so the grid grows first. */
