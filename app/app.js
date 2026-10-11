@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.10.7';
+var APP_VERSION = '2026.10.11.1';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
 /** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
 var LOCK_TTL_MS = 10000;
@@ -219,7 +219,8 @@ if (typeof document !== 'undefined') {
     var TABS = ['log', 'status'];
     var settings = load(STORAGE.settings, { url: '', token: '', theme: 'auto' });
     if (!settings.theme) settings.theme = 'auto';
-    var data = load(STORAGE.data, { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' });
+    function emptyData() { return { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' }; }
+    var data = load(STORAGE.data, emptyData());
     var queue = load(STORAGE.queue, []);
     var ui = { tab: 'log', mode: 'flight', query: '', statusQuery: '', counts: {}, syncing: false, lastError: '', settingsOpen: false, dateTouched: false };
     var toastTimer = null;
@@ -250,10 +251,14 @@ if (typeof document !== 'undefined') {
       if (e.key === STORAGE.lock) claimLock();
       // The logging tab wrote the queue; a watching tab shows its count.
       if (e.key === STORAGE.queue && !hasLock) { queue = load(STORAGE.queue, []); render(); }
-      // Another tab saved the connection or the theme: this tab follows, and a sync in flight is superseded.
+      // Another tab synced: this tab shows the same payload.
+      if (e.key === STORAGE.data) { data = load(STORAGE.data, emptyData()); render(); }
+      // Another tab saved the connection or the theme: this tab follows, a sync in flight is
+      // superseded, and taps made against the previous workbook's events are dropped.
       if (e.key === STORAGE.settings) {
-        settings = load(STORAGE.settings, settings);
+        settings = load(STORAGE.settings, { url: '', token: '', theme: settings.theme });
         generation++;
+        ui.counts = {};
         applyTheme();
         if (!ui.settingsOpen) fillSettingsForm();
         render();
@@ -550,8 +555,8 @@ if (typeof document !== 'undefined') {
         .then(function () {
           ui.syncing = false;
           render();
-          // The connection changed while this sync ran: run once more with the new one.
-          if (!live()) sync();
+          // The connection changed while this sync ran: run once more with the new one, if there is one.
+          if (!live() && settings.url && settings.token) sync();
         });
     }
 
@@ -698,7 +703,7 @@ if (typeof document !== 'undefined') {
       ['settings', 'data', 'queue'].forEach(function (k) { try { localStorage.removeItem(STORAGE[k]); } catch (err) { /* ignore */ } });
       settings = { url: '', token: '', theme: settings.theme };
       save(STORAGE.settings, settings);
-      data = { ground: [], flying: [], summary: [], logCheck: [], asOf: '', lastSync: '' };
+      data = emptyData();
       queue = [];
       ui.counts = {};
       ui.lastError = '';

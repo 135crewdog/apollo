@@ -51,6 +51,7 @@ class Sheet {
       getValue() { book.reads++; return cell(r - 1, c - 1); },
       getValues() { book.reads++; const out = []; for (let i = 0; i < nr; i++) { const row = []; for (let j = 0; j < nc; j++) row.push(cell(r - 1 + i, c - 1 + j)); out.push(row); } return out; },
       getNumberFormat() { book.reads++; return s.formats[`${r},${c}`] || 'General'; },
+      getNumberFormats() { book.reads++; const out = []; for (let i = 0; i < nr; i++) { const row = []; for (let j = 0; j < nc; j++) row.push(s.formats[`${r + i},${c + j}`] || 'General'); out.push(row); } return out; },
       setValue(v) { book.writes++; s.data[r - 1] = s.data[r - 1] || []; s.data[r - 1][c - 1] = v; },
       setValues(vals) {
         book.writes++;
@@ -98,7 +99,8 @@ function makeWorkbook(opts = {}) {
     post: (body) => ctx.doPost({ postData: { contents: JSON.stringify(body) } }),
   };
   book.fn = ctx;
-  book.summary = () => book.sheets['Individual Training Summary'].data;
+  // The summary tab's rows, without the blank rows the script writes below them.
+  book.summary = () => { const d = book.sheets['Individual Training Summary'].data.slice(); while (d.length && d[d.length - 1].every((v) => v === '' || v == null)) d.pop(); return d; };
   book.log = () => book.sheets['Training Log'].data;
   book.resetCounts = () => { book.reads = 0; book.writes = 0; };
   return book;
@@ -168,12 +170,12 @@ test('POST writes the summary tab once and does not read the log twice', () => {
   book.resetCounts();
   book.api.post({ token: 'secret', batchId: 'b1', rows: [{ mission: '', date: '2026-10-04', id: 'G1' }] });
   assert.equal(book.reads, 9, 'log header row and last row for the append; three tabs and the log header row to compute; color rules (short, so no format read), filter and header check to write');
-  assert.equal(book.writes, 8, 'append (format and values); format once (two formats, frozen row, colors); clear and values');
+  assert.equal(book.writes, 7, 'append (format and values); format once (two formats, frozen row, colors); one write of values');
   assert.equal(book.summary()[0][0], 'Task ID');
   book.resetCounts();
   book.api.post({ token: 'secret', batchId: 'b2', rows: [{ mission: '', date: '2026-10-05', id: 'G1' }] });
-  assert.equal(book.reads, 10, 'second save: one more read for the last cell\'s format once the color rules reach the last row');
-  assert.equal(book.writes, 4, 'second save: append (format and values), values, clear below; formatting is not repeated');
+  assert.equal(book.reads, 10, 'second save: one more read for the last row\'s formats once the color rules reach the last row');
+  assert.equal(book.writes, 3, 'second save: append (format and values), one write of values; formatting is not repeated');
 });
 
 test('batch ids are capped at 50', () => {
@@ -318,21 +320,26 @@ test('formatting runs again only when the color rules stop short of the last row
   const formatted = () => book.writes;
   book.resetCounts();
   book.fn.refresh();
-  assert.equal(formatted(), 2, 'clear and values only when the rules reach the last row');
+  assert.equal(formatted(), 1, 'one write of values when the tab is formatted');
   summary.maxRows = 80; // the tab grew by hand
   book.resetCounts();
   book.fn.refresh();
-  assert.equal(formatted(), 6, 'formats, frozen row and colors set once more');
+  assert.equal(formatted(), 5, 'formats, frozen row and colors set once more');
   assert.equal(summary.rules[0].getRanges()[0].getLastRow(), 80);
   assert.equal(summary.formats['80,1'], '@');
   book.resetCounts();
   book.fn.refresh();
-  assert.equal(formatted(), 2);
-  summary.formats['80,1'] = 'General'; // the number formats were changed by hand while the rules stayed
+  assert.equal(formatted(), 1);
+  summary.formats['80,4'] = 'General'; // the Due Date format was changed by hand while the rules stayed
   book.resetCounts();
   book.fn.refresh();
-  assert.equal(formatted(), 6, 'formats set once more');
-  assert.equal(summary.formats['80,1'], '@');
+  assert.equal(formatted(), 5, 'formats set once more');
+  assert.equal(summary.formats['80,4'], '@');
+  summary.formats['80,8'] = 'General'; // the Percent Complete format
+  book.resetCounts();
+  book.fn.refresh();
+  assert.equal(formatted(), 5, 'formats set once more for the percent column');
+  assert.equal(summary.formats['80,8'], '0%');
 });
 
 test('a write failure on the summary tab is reported and the tab is kept; only a Table rebuilds it', () => {

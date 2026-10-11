@@ -172,7 +172,7 @@ In the sheet, Task ID through Overdue are written as plain text, so dates stay `
 
 ### Due Date colors
 
-The bands are one list in `rules.js` (`DUE_BANDS`) that feeds both the sheet's conditional formatting and the `band` field on each summary row in the API, so the app displays a band without doing date math. The script sets the summary tab's text and percent formats, frozen header and color rules once, on whole columns, when the tab is created, rebuilt or found unformatted; a refresh clears and rewrites values only. Display only; no rule lives here. First match wins.
+The bands are one list in `rules.js` (`DUE_BANDS`) that feeds both the sheet's conditional formatting and the `band` field on each summary row in the API, so the app displays a band without doing date math. The script sets the summary tab's text and percent formats, frozen header and color rules once, on whole columns, when the tab is created, rebuilt or found unformatted (color rules short of the last row, or the last row's text or percent format changed by hand); a refresh rewrites the values in one write, new rows then blanks to the last row of the grid, so a failed write leaves the previous summary. Display only; no rule lives here. First match wins.
 
 | Band | Test | Color |
 |---|---|---|
@@ -243,7 +243,7 @@ Every response is JSON. Apps Script cannot set HTTP status codes, so errors come
 
 **Sync.** Save puts the rows into the local queue as one batch with a fresh `batchId` and tries to sync at once. Sync sends queued batches in order with POST, then, if nothing was sent, refreshes with GET. It runs on load, after Save, when the browser comes back online, when the app becomes visible with rows waiting or a summary from an earlier day, and from Sync now. A network failure keeps the queue and says so; a `{ ok: false }` reply keeps the queue and shows the error. An acknowledged batch leaves the queue by its `batchId`. A reply that arrives after Clear local data or a connection change (URL or token, in this tab or another) is dropped, and the sync runs once more with the new connection. The payload from the last successful call is what Status shows.
 
-**One logging tab at a time.** A tab holds a lock in local storage and refreshes it every few seconds; a lock that stops refreshing expires. A second tab or window in the same browser shows a notice, keeps the steppers and Save off, sends no rows, and still reads Status. The lock is released when the page is hidden and claimed again when it is shown. A connection or theme saved in one tab reaches the others.
+**One logging tab at a time.** A tab holds a lock in local storage and refreshes it every few seconds; a lock that stops refreshing expires. A second tab or window in the same browser shows a notice, keeps the steppers and Save off, sends no rows, and still reads Status. The lock is released when the page is hidden and claimed again when it is shown. A connection, theme or payload saved in one tab reaches the others; a connection change drops any taps made in the other tab.
 
 **Storage.** `localStorage` keys `apollo.settings` (`{ url, token, theme }`), `apollo.data` (the last payload plus `lastSync`), `apollo.queue` (`[{ batchId, rows }]`) and `apollo.lock` (`{ id, at }`, the logging tab's heartbeat).
 

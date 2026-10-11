@@ -604,6 +604,9 @@ test('override conflict: a row the summary does not count takes no part (SIM at 
     { row: 3, mission: '0123', date: '2026-03-01', id: 'F1', dueOverride: '2027-06-30' },
   ];
   assert.deepEqual(rules.checkLog(log, [], flying, TODAY), [], 'the aircraft override is the one in use, so nothing to report');
+  log[0].dueOverride = '2027-12-31'; // a later override on the row that does not count: still nothing to report
+  assert.deepEqual(rules.checkLog(log, [], flying, TODAY), []);
+  log[0].dueOverride = '2027-01-31';
   const row = rules.buildSummary([], flying, log, TODAY)[0];
   assert.equal(row['Due Date'], '2027-06-30');
   // With sim credit the SIM row counts, and its earlier override wins.

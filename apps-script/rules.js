@@ -426,7 +426,7 @@ function checkLog(log, ground, flying, today) {
     else if (today && formatDate(date) > today) problem = 'date is after today, row still counted';
     else if (rowKind(mission) === 'aircraft' && /^sim/i.test(mission)) problem = 'Mission Number looks like SIM but is not exactly SIM, counted as an aircraft row';
     else if (overrideText !== '' && !override) problem = 'Due Date Override is not a date, override ignored';
-    else if (override && formatDate(override) > earliest[id + '|' + formatDate(date)]) problem = 'another row on the same Date has an earlier Due Date Override, this one ignored';
+    else if (override && rowCounts(known[id], mission) && formatDate(override) > earliest[id + '|' + formatDate(date)]) problem = 'another row on the same Date has an earlier Due Date Override, this one ignored';
     else if (override && formatDate(override) < formatDate(date)) problem = 'Due Date Override is before the row\'s Date, override still used';
     if (problem) out.push({ row: entry.row, mission: entry.mission, date: entry.date, id: entry.id, problem: problem });
   }
