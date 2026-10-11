@@ -204,7 +204,7 @@ test('refresh: date cells read as calendar dates, rows ordered ground then flyin
   assert.equal(sheet.rules.length, 4);
   assert.equal(sheet.rules[0].formula, '=$E2="YES"');
   assert.match(sheet.rules[1].formula, /DATEVALUE\(\$D2\) - TODAY\(\), 999\) <= 30/);
-  assert.equal(sheet.rules[3].background, '#FFF2CC');
+  assert.equal(sheet.rules[3].background, '#FFE599');
   assert.equal(sheet.rules[0].getRanges()[0].getLastRow(), 50, 'color rules reach the last row');
   assert.match(book.toasts[0].msg, /no problems in 2 rows/);
   assert.equal(book.timeZoneReads, 1, 'the time zone is read once per refresh');
