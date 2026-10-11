@@ -216,16 +216,22 @@ async function main() {
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => document.getElementById('status-head').textContent.includes('0 rows waiting'));
-    // A connection saved in the watching tab reaches the logging tab.
+    // A theme saved in the watching tab reaches the logging tab and keeps its taps; a
+    // connection saved there reaches it too and drops them.
+    await page.click('#events button[data-id="AL01YM"][data-delta="1"]');
+    assert.equal(await page.textContent('#save'), 'Save 1 row');
     await tab2.click('#settings-btn');
     await tab2.fill('#token', 'abc123');
     await tab2.selectOption('#theme', 'dark');
     await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark');
     await tab2.selectOption('#theme', 'light');
     await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light');
+    assert.equal(await page.textContent('#save'), 'Save 1 row', 'a theme change keeps the taps');
     await tab2.fill('#token', 'wrong');
     await tab2.click('#save-settings');
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('apollo.settings')).token === 'wrong');
+    assert.equal(await page.textContent('#save'), 'Save', 'a connection change drops the taps');
+    assert.equal(await page.locator('#events .event').count(), 3, 'a token change keeps the payload');
     await page.click('#settings-btn');
     assert.equal(await page.inputValue('#token'), 'wrong', 'the other tab\'s token reached this tab');
     await page.fill('#token', 'abc123');
@@ -250,6 +256,7 @@ async function main() {
     await page.waitForFunction(() => document.getElementById('settings-error').textContent.includes('Sync them first'));
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('apollo.settings')).url), apiUrl, 'URL unchanged with rows pending');
     assert.equal(await page.inputValue('#url'), apiUrl + '?other=1', 'the typed URL is still in the field');
+    assert.ok((await page.evaluate(() => JSON.parse(localStorage.getItem('apollo.data')).asOf)), 'a refused switch keeps the payload');
     // Settings drafts survive a sync.
     await page.fill('#url', apiUrl);
     await page.fill('#token', 'draft-not-saved');

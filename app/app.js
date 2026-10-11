@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.11.2';
+var APP_VERSION = '2026.10.11.3';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
 /** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
 var LOCK_TTL_MS = 10000;
@@ -227,6 +227,19 @@ if (typeof document !== 'undefined') {
     // A reply from before Clear local data or a connection change is ignored.
     var generation = 0;
 
+    /**
+     * The connection is about to change from the saved one to (url, token). A sync in flight is
+     * superseded and taps are dropped; a new URL is a new workbook, so the payload goes too and
+     * nothing of the old workbook is offered until the new one answers. Returns true on a change.
+     */
+    function connectionChanging(url, token) {
+      if (url === settings.url && token === settings.token) return false;
+      generation++;
+      ui.counts = {};
+      if (url !== settings.url) { data = emptyData(); save(STORAGE.data, data); }
+      return true;
+    }
+
     // ---- one logging tab at a time ----
 
     var TAB_ID = newBatchId();
@@ -256,9 +269,9 @@ if (typeof document !== 'undefined') {
       // Another tab saved the connection or the theme: this tab follows, a sync in flight is
       // superseded, and taps made against the previous workbook's events are dropped.
       if (e.key === STORAGE.settings) {
-        settings = load(STORAGE.settings, { url: '', token: '', theme: settings.theme });
-        generation++;
-        ui.counts = {};
+        var next = load(STORAGE.settings, { url: '', token: '', theme: settings.theme });
+        connectionChanging(next.url, next.token);
+        settings = next;
         applyTheme();
         if (!ui.settingsOpen) fillSettingsForm();
         render();
@@ -674,7 +687,7 @@ if (typeof document !== 'undefined') {
       var url = $('url').value.trim();
       if (pendingBlocksSwitch(url)) { render(); toast(ui.lastError); return; }
       var token = $('token').value.trim();
-      if (url !== settings.url || token !== settings.token) generation++;
+      connectionChanging(url, token);
       settings.url = url;
       settings.token = token;
       save(STORAGE.settings, settings);
@@ -730,7 +743,7 @@ if (typeof document !== 'undefined') {
       if (!h) return false;
       try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (err) { /* leave the fragment */ }
       if (pendingBlocksSwitch(h.url)) { ui.lastError += ' Then open the link again.'; ui.settingsOpen = true; fillSettingsForm(); return false; }
-      if (h.url !== settings.url || h.token !== settings.token) generation++;
+      connectionChanging(h.url, h.token);
       settings.url = h.url;
       settings.token = h.token;
       save(STORAGE.settings, settings);
