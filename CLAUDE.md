@@ -298,6 +298,10 @@ Discussed, not adopted, might come back. Ask before building.
 - **An Apollo → Set up menu** in the sheet that generates and stores the token, writes the headers, and shows the remaining deploy steps in a dialog. Considered for milestone 3 alongside the template workbook and the handoff link; the user chose those two and parked this.
 - **A reminder email** from the script when something is due soon. The Status screen is the only nudge for now.
 
+## Owner to-do (outside the code)
+
+- **Re-check every access and privacy setting (added 2026-10-11).** Four separate switches, each with its own right answer: the workbook's Drive sharing, which should be Restricted; the Apps Script web app deployment, which must stay Execute as Me and Who has access Anyone, taking updates as new versions of the same deployment so the URL never changes (the app calls it as a stranger and proves itself with the token, so the sheet stays private); the Apps Script project's own sharing, which follows the workbook; and the template workbook, which must stay Anyone with the link: Viewer or the copy link stops working. Then Apollo → Connect device to reconnect the phone if the URL changed.
+
 ## Source documents
 
 RTM = KC-135 RAP Tasking Memo, 1 Oct 24, Change 2 (30 Jun 25): paragraph 7c, Table 7.1 (ground), Table 7.2 (pilot flying). The user is an Evaluator Pilot using the MP / FTL A column. The config tabs, not this file, hold the event list. Volume is counted per fiscal year; confirm against Table 7.2 that no event states its volume per semi-annual period.
