@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var APP_VERSION = '2026.10.11.3';
+var APP_VERSION = '2026.10.11.4';
 var STORAGE = { settings: 'apollo.settings', data: 'apollo.data', queue: 'apollo.queue', lock: 'apollo.lock' };
 /** One tab logs at a time. A tab holds the lock while it heartbeats; a silent tab loses it after this long. */
 var LOCK_TTL_MS = 10000;

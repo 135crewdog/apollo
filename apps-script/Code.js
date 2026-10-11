@@ -20,7 +20,7 @@ var GROUND_HEADERS = ['Task ID', 'Task Name', 'Frequency'];
 var FLYING_HEADERS = ['Task ID', 'Task Name', 'Currency', 'Volume Required', 'Percent Credit in Sim'];
 
 /** Bump on every change to Code.js or rules.js. Returned in the API payload and shown in the app's Settings. */
-var SCRIPT_VERSION = '2026.10.11.1';
+var SCRIPT_VERSION = '2026.10.11.2';
 
 var APP_URL = 'https://135crewdog.github.io/apollo/';
 var PROP_TOKEN = 'APOLLO_TOKEN';
@@ -130,7 +130,7 @@ function connectDevice() {
   var style = '<style>body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1c1c1e;margin:0;padding:16px}' +
     'textarea{width:100%;box-sizing:border-box;height:88px;font:13px/1.4 Menlo,Consolas,monospace;padding:8px;border:1px solid #c6c6c8;border-radius:8px;resize:none}' +
     'button,a.btn{display:inline-block;font:600 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:10px 16px;border-radius:10px;border:0;cursor:pointer;text-decoration:none;margin:10px 8px 0 0}' +
-    'button{background:#EA9999;color:#1c1c1e}a.btn{background:#e5e5ea;color:#1c1c1e}p{margin:0 0 10px}.note{color:#8e8e93;font-size:13px}</style>';
+    'button{background:#E06666;color:#1c1c1e}a.btn{background:#e5e5ea;color:#1c1c1e}p{margin:0 0 10px}.note{color:#8e8e93;font-size:13px}</style>';
   var body;
   if (missing.length) {
     body = '<p>Two things make the link, and this workbook is missing one:</p><p>' + missing.map(escapeHtml).join('</p><p>') + '</p><p class="note">Then open Apollo \u2192 Connect device again.</p>';

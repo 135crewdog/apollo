@@ -194,10 +194,10 @@ function dueDate(label, lastAccomplished) {
  * API's band field are both built from this list. First match wins.
  */
 var DUE_BANDS = [
-  { band: 'overdue', background: '#666666', fontColor: '#FFFFFF' },
-  { band: 'd30', days: 30, background: '#EA9999' },
-  { band: 'd60', days: 60, background: '#F9CB9C' },
-  { band: 'd90', days: 90, background: '#FFF2CC' }
+  { band: 'overdue', background: '#434343', fontColor: '#FFFFFF' },
+  { band: 'd30', days: 30, background: '#E06666' },
+  { band: 'd60', days: 60, background: '#F6B26B' },
+  { band: 'd90', days: 90, background: '#FFE599' }
 ];
 
 /** The band for a summary row on a given day: 'overdue', 'd30', 'd60', 'd90' or ''. */

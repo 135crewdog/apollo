@@ -15,10 +15,10 @@
   --error-border: rgba(255, 59, 48, 0.35);
   --error-text: #b3261e;
   /* Due-date palette */
-  --red: #ea9999;
-  --orange: #f9cb9c;
-  --yellow: #fff2cc;
-  --gray: #666666;
+  --red: #e06666;
+  --orange: #f6b26b;
+  --yellow: #ffe599;
+  --gray: #434343;
   --on-accent: #1c1c1e;
   --band-text: #1c1c1e;
   --shadow: rgba(0, 0, 0, 0.1);
